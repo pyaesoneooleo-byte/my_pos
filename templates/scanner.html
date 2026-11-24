@@ -41,9 +41,24 @@
 const BRANCH_CODE = "{{ branch.code }}";
 let isCooldown = false;
 let isScanning = false;
-let currentFacingMode = "environment"; // "environment" = နောက်, "user" = ရှေ့
+let cameras = [];
+let currentCamIndex = 0;
 let wakeLock = null;
 const html5QrCode = new Html5Qrcode("reader");
+
+async function loadCameras() {
+  if (cameras.length > 0) return cameras;
+  cameras = await Html5Qrcode.getCameras();
+  if (!cameras || cameras.length === 0) {
+    throw new Error("ဖုန်းထဲတွင် Camera မတွေ့ပါ");
+  }
+  // နောက်ကင်မရာ (back / rear / environment) ရှိရင် အရင်ရွေးထားမယ်
+  const backIdx = cameras.findIndex(c =>
+    /back|rear|environment/i.test(c.label)
+  );
+  currentCamIndex = backIdx !== -1 ? backIdx : cameras.length - 1;
+  return cameras;
+}
 
 async function setWakeLock(enable) {
   if (!("wakeLock" in navigator)) return;
@@ -104,9 +119,12 @@ async function startScanner() {
   const btn = document.getElementById("toggle-btn");
   const statusBox = document.getElementById("status");
 
+  await loadCameras();
+  const selectedCam = cameras[currentCamIndex];
+
   document.getElementById("reader").innerText = "";
   await html5QrCode.start(
-    { facingMode: currentFacingMode },
+    selectedCam.id,
     { fps: 10, qrbox: { width: 250, height: 250 } },
     onScanSuccess
   );
@@ -115,8 +133,7 @@ async function startScanner() {
   btn.innerText = "ကင်မရာ ခဏပိတ်မယ်";
   btn.className = "stop";
   statusBox.className = "";
-  const camLabel = currentFacingMode === "environment" ? "နောက်ကင်မရာ" : "ရှေ့ကင်မရာ";
-  statusBox.innerText = `${camLabel} ဖြင့် Scan ဖတ်နေပါသည်...`;
+  statusBox.innerText = `သုံးနေသည်: ${selectedCam.label || "Camera " + (currentCamIndex + 1)}`;
 }
 
 async function stopScanner() {
@@ -150,16 +167,17 @@ async function toggleCamera() {
 
 async function switchCamera() {
   const statusBox = document.getElementById("status");
-  currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
-
-  if (!isScanning) {
-    const camLabel = currentFacingMode === "environment" ? "နောက်ကင်မရာ" : "ရှေ့ကင်မရာ";
-    statusBox.className = "";
-    statusBox.innerText = `ရွေးချယ်ထားသည်: ${camLabel} (ဖွင့်ရန် ခလုတ်နှိပ်ပါ)`;
-    return;
-  }
-
   try {
+    await loadCameras();
+    currentCamIndex = (currentCamIndex + 1) % cameras.length;
+    const nextCam = cameras[currentCamIndex];
+
+    if (!isScanning) {
+      statusBox.className = "";
+      statusBox.innerText = `ရွေးထားသည်: ${nextCam.label || "Camera " + (currentCamIndex + 1)}`;
+      return;
+    }
+
     await html5QrCode.stop();
     isScanning = false;
     await startScanner();
