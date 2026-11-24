@@ -1,6 +1,6 @@
 flask
-openpyxl
-qrcode
-pillow
 gunicorn
 werkzeug
+qrcode
+pillow
+openpyxl
