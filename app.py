@@ -187,14 +187,30 @@ def index_page():
 def pos_page(branch_code):
     conn = get_db()
     branch = conn.execute("SELECT * FROM branches WHERE code = ?", (branch_code,)).fetchone()
-    conn.close()
     if not branch:
+        conn.close()
         return redirect(url_for("index_page"))
 
+    products = conn.execute('''
+        SELECT p.id, p.code, p.name, p.price, COALESCE(bs.stock, 0) AS stock
+        FROM products p
+        LEFT JOIN branch_stocks bs
+            ON bs.product_id = p.id AND bs.branch_id = ?
+        ORDER BY p.id DESC
+    ''', (branch["id"],)).fetchall()
+    conn.close()
+
+    product_list = [dict(row) for row in products]
     base_url = request.host_url.rstrip("/")
     scanner_url = f"{base_url}/scanner/{branch['code']}"
     scanner_qr = make_qr_base64(scanner_url)
-    return render_template("pos.html", branch=branch, scanner_url=scanner_url, scanner_qr=scanner_qr)
+    return render_template(
+        "pos.html",
+        branch=branch,
+        products=product_list,
+        scanner_url=scanner_url,
+        scanner_qr=scanner_qr
+    )
 
 @app.route("/scanner/<branch_code>")
 def scanner_page(branch_code):
@@ -249,7 +265,6 @@ def admin_page():
     branches = conn.execute("SELECT * FROM branches ORDER BY id ASC").fetchall()
     products = conn.execute("SELECT * FROM products ORDER BY id DESC").fetchall()
 
-    # ဆိုင်ခွဲအလိုက် လက်ကျန်စာရင်းများ
     stock_rows = conn.execute('''
         SELECT bs.branch_id, b.name AS branch_name, p.id AS product_id, p.code, p.name, p.price, bs.stock
         FROM branch_stocks bs
@@ -258,7 +273,6 @@ def admin_page():
         ORDER BY b.id ASC, p.id DESC
     ''').fetchall()
 
-    # ပစ္စည်းတစ်ခုချင်းစီ၏ ဆိုင်ခွဲအားလုံးပေါင်း လက်ကျန်
     total_by_pid = {}
     for sr in stock_rows:
         total_by_pid[sr["product_id"]] = total_by_pid.get(sr["product_id"], 0) + sr["stock"]
@@ -310,7 +324,6 @@ def add_branch():
     try:
         c.execute("INSERT INTO branches (code, name) VALUES (?, ?)", (custom_code, name))
         new_bid = c.lastrowid
-        # ရှိပြီးသား ပစ္စည်းအားလုံးအတွက် လက်ကျန် 0 ဖြင့် စာရင်းဖွင့်ပေးခြင်း
         products = c.execute("SELECT id FROM products").fetchall()
         for p in products:
             c.execute("INSERT OR IGNORE INTO branch_stocks (branch_id, product_id, stock) VALUES (?, ?, 0)", (new_bid, p["id"]))
