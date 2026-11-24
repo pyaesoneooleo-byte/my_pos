@@ -1,0 +1,6 @@
+flask
+openpyxl
+qrcode
+pillow
+gunicorn
+werkzeug
