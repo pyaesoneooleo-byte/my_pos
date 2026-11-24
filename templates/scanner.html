@@ -12,12 +12,19 @@
   #status { padding: 14px; border-radius: 8px; margin: 15px auto; max-width: 420px; font-size: 16px; font-weight: bold; background: #1e293b; }
   .ok { background: #15803d !important; }
   .err { background: #b91c1c !important; }
+  .controls { max-width: 420px; margin: 10px auto 0; display: flex; gap: 10px; }
   #toggle-btn {
-    width: 100%; max-width: 420px; padding: 16px; font-size: 18px; font-weight: bold;
+    flex: 2; padding: 16px; font-size: 17px; font-weight: bold;
     border: none; border-radius: 10px; cursor: pointer; color: #fff;
-    background: #16a34a; margin-top: 10px;
+    background: #16a34a;
   }
   #toggle-btn.stop { background: #dc2626; }
+  #switch-btn {
+    flex: 1; padding: 16px 10px; font-size: 15px; font-weight: bold;
+    border: none; border-radius: 10px; cursor: pointer; color: #fff;
+    background: #334155;
+  }
+  #switch-btn:hover { background: #475569; }
 </style>
 </head>
 <body>
@@ -25,12 +32,16 @@
   <h2 style="margin:4px 0;">Wireless Scanner</h2>
   <div id="reader">ကင်မရာ ပိတ်ထားပါသည်</div>
   <div id="status">Scan ဖတ်ရန် အောက်ပါခလုတ်ကို နှိပ်ပါ</div>
-  <button id="toggle-btn" onclick="toggleCamera()">ကင်မရာ ဖွင့်မယ်</button>
+  <div class="controls">
+    <button id="toggle-btn" onclick="toggleCamera()">ကင်မရာ ဖွင့်မယ်</button>
+    <button id="switch-btn" onclick="switchCamera()">🔄 Camera ပြောင်း</button>
+  </div>
 
 <script>
 const BRANCH_CODE = "{{ branch.code }}";
 let isCooldown = false;
 let isScanning = false;
+let currentFacingMode = "environment"; // "environment" = နောက်, "user" = ရှေ့
 let wakeLock = null;
 const html5QrCode = new Html5Qrcode("reader");
 
@@ -89,39 +100,73 @@ async function onScanSuccess(decodedText) {
   setTimeout(() => { isCooldown = false; }, 1500);
 }
 
-async function toggleCamera() {
+async function startScanner() {
   const btn = document.getElementById("toggle-btn");
   const statusBox = document.getElementById("status");
 
-  if (!isScanning) {
-    try {
-      document.getElementById("reader").innerText = "";
-      await html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        onScanSuccess
-      );
-      isScanning = true;
-      await setWakeLock(true);
-      btn.innerText = "ကင်မရာ ခဏပိတ်မယ်";
-      btn.className = "stop";
-      statusBox.className = "";
-      statusBox.innerText = "QR / Barcode ကို ကင်မရာရှေ့ပြပါ...";
-    } catch (err) {
-      statusBox.className = "err";
-      statusBox.innerText = "ကင်မရာဖွင့်မရပါ: " + err;
+  document.getElementById("reader").innerText = "";
+  await html5QrCode.start(
+    { facingMode: currentFacingMode },
+    { fps: 10, qrbox: { width: 250, height: 250 } },
+    onScanSuccess
+  );
+  isScanning = true;
+  await setWakeLock(true);
+  btn.innerText = "ကင်မရာ ခဏပိတ်မယ်";
+  btn.className = "stop";
+  statusBox.className = "";
+  const camLabel = currentFacingMode === "environment" ? "နောက်ကင်မရာ" : "ရှေ့ကင်မရာ";
+  statusBox.innerText = `${camLabel} ဖြင့် Scan ဖတ်နေပါသည်...`;
+}
+
+async function stopScanner() {
+  const btn = document.getElementById("toggle-btn");
+  const statusBox = document.getElementById("status");
+
+  await html5QrCode.stop();
+  isScanning = false;
+  await setWakeLock(false);
+  document.getElementById("reader").innerText = "ကင်မရာ ပိတ်ထားပါသည်";
+  btn.innerText = "ကင်မရာ ဖွင့်မယ်";
+  btn.className = "";
+  statusBox.className = "";
+  statusBox.innerText = "Scan ဖတ်ရန် ခလုတ်ကို ပြန်နှိပ်ပါ";
+}
+
+async function toggleCamera() {
+  const statusBox = document.getElementById("status");
+  try {
+    if (!isScanning) {
+      await startScanner();
+    } else {
+      await stopScanner();
     }
-  } else {
-    try {
-      await html5QrCode.stop();
-      isScanning = false;
-      await setWakeLock(false);
-      document.getElementById("reader").innerText = "ကင်မရာ ပိတ်ထားပါသည်";
-      btn.innerText = "ကင်မရာ ဖွင့်မယ်";
-      btn.className = "";
-      statusBox.className = "";
-      statusBox.innerText = "Scan ဖတ်ရန် ခလုတ်ကို ပြန်နှိပ်ပါ";
-    } catch (err) {}
+  } catch (err) {
+    isScanning = false;
+    statusBox.className = "err";
+    statusBox.innerText = "ကင်မရာဖွင့်မရပါ: " + err;
+  }
+}
+
+async function switchCamera() {
+  const statusBox = document.getElementById("status");
+  currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+
+  if (!isScanning) {
+    const camLabel = currentFacingMode === "environment" ? "နောက်ကင်မရာ" : "ရှေ့ကင်မရာ";
+    statusBox.className = "";
+    statusBox.innerText = `ရွေးချယ်ထားသည်: ${camLabel} (ဖွင့်ရန် ခလုတ်နှိပ်ပါ)`;
+    return;
+  }
+
+  try {
+    await html5QrCode.stop();
+    isScanning = false;
+    await startScanner();
+  } catch (err) {
+    isScanning = false;
+    statusBox.className = "err";
+    statusBox.innerText = "Camera ပြောင်းမရပါ: " + err;
   }
 }
 </script>
