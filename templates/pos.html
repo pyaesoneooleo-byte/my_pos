@@ -23,6 +23,19 @@
   .btn-pay { width: 100%; padding: 14px; background: #16a34a; color: #fff; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; }
   .btn-pay:hover { background: #15803d; }
 
+  /* Product Catalog Grid */
+  .catalog-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  #productSearch { width: 220px; padding: 7px 10px; font-size: 13px; }
+  #product-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+    gap: 10px; max-height: 240px; overflow-y: auto; padding: 4px; margin-bottom: 14px;
+  }
+  .prod-card {
+    border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px;
+    cursor: pointer; background: #f8fafc; transition: 0.15s;
+  }
+  .prod-card:hover { background: #eff6ff; border-color: #3b82f6; }
+
   /* PC Webcam Box */
   .cam-box { background: #0f172a; color: #fff; padding: 12px; border-radius: 8px; text-align: center; }
   #webcam-reader { width: 100%; border-radius: 6px; overflow: hidden; margin: 8px 0; }
@@ -66,6 +79,25 @@
 
 <div class="container">
   <div class="left">
+    <div class="catalog-header">
+      <strong>ဆိုင်ခွဲ ပစ္စည်းစာရင်း ({{ products|length }} မျိုး)</strong>
+      <input type="text" id="productSearch" placeholder="ပစ္စည်းအမည် / ကုတ် ရှာရန်..." oninput="filterProducts()">
+    </div>
+
+    <div id="product-grid">
+      {% for p in products %}
+      <div class="prod-card" data-search="{{ (p.code ~ ' ' ~ p.name)|lower }}"
+           onclick='addToCart({ code: {{ p.code|tojson }}, name: {{ p.name|tojson }}, price: {{ p.price|int }} })'>
+        <div style="font-size:11px; color:#64748b;">{{ p.code }}</div>
+        <div style="font-weight:bold; font-size:14px; margin:3px 0;">{{ p.name }}</div>
+        <div style="color:#0f766e; font-weight:bold; font-size:13px;">{{ "{:,}".format(p.price|int) }} ကျပ်</div>
+        <div style="font-size:12px; color:{{ '#dc2626' if p.stock <= 0 else '#334155' }}; margin-top:2px;">
+          လက်ကျန်: {{ p.stock }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
     <div style="display:flex; gap:10px; margin-bottom:10px;">
       <input type="text" id="manualCode" placeholder="ပစ္စည်းကုတ် ရိုက်ထည့်ပြီး Enter ခေါက်နိုင်သည် (ဥပမာ P0001)">
       <button onclick="manualAdd()" style="padding:0 18px; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer;">ထည့်မယ်</button>
@@ -146,6 +178,14 @@ let cart = [];
 let webcamScanner = null;
 let isWebcamRunning = false;
 let scanCooldown = false;
+
+function filterProducts() {
+  const q = (document.getElementById("productSearch").value || "").trim().toLowerCase();
+  document.querySelectorAll("#product-grid .prod-card").forEach(card => {
+    const hay = card.getAttribute("data-search") || "";
+    card.style.display = (!q || hay.includes(q)) ? "" : "none";
+  });
+}
 
 function playBeep() {
   try {
@@ -234,7 +274,7 @@ function addToCart(product) {
   if (existing) {
     existing.qty += 1;
   } else {
-    cart.push({ ...product, qty: 1 });
+    cart.push({ code: product.code, name: product.name, price: Number(product.price), qty: 1 });
   }
   renderCart();
 }
@@ -334,6 +374,7 @@ async function checkout() {
 
     window.print();
     clearCart();
+    location.reload();
   }
 }
 </script>
