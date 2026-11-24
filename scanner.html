@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scanner - {{ branch.name }}</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+  body { font-family: sans-serif; margin: 0; background: #0f172a; color: #fff; text-align: center; padding: 15px; }
+  .badge { display: inline-block; background: #2563eb; padding: 5px 14px; border-radius: 20px; font-size: 14px; margin-bottom: 8px; }
+  #reader { width: 100%; max-width: 420px; min-height: 260px; margin: 15px auto; border-radius: 12px; overflow: hidden; background: #1e293b; display: flex; align-items: center; justify-content: center; }
+  #status { padding: 14px; border-radius: 8px; margin: 15px auto; max-width: 420px; font-size: 16px; font-weight: bold; background: #1e293b; }
+  .ok { background: #15803d !important; }
+  .err { background: #b91c1c !important; }
+  #toggle-btn {
+    width: 100%; max-width: 420px; padding: 16px; font-size: 18px; font-weight: bold;
+    border: none; border-radius: 10px; cursor: pointer; color: #fff;
+    background: #16a34a; margin-top: 10px;
+  }
+  #toggle-btn.stop { background: #dc2626; }
+</style>
+</head>
+<body>
+  <div class="badge">{{ branch.name }}</div>
+  <h2 style="margin:4px 0;">Wireless Scanner</h2>
+  <div id="reader">ကင်မရာ ပိတ်ထားပါသည်</div>
+  <div id="status">Scan ဖတ်ရန် အောက်ပါခလုတ်ကို နှိပ်ပါ</div>
+  <button id="toggle-btn" onclick="toggleCamera()">ကင်မရာ ဖွင့်မယ်</button>
+
+<script>
+const BRANCH_CODE = "{{ branch.code }}";
+let isCooldown = false;
+let isScanning = false;
+let wakeLock = null;
+const html5QrCode = new Html5Qrcode("reader");
+
+async function setWakeLock(enable) {
+  if (!("wakeLock" in navigator)) return;
+  try {
+    if (enable && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request("screen");
+    } else if (!enable && wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
+    }
+  } catch (e) {}
+}
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(1200, ctx.currentTime);
+    osc.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+  } catch(e) {}
+}
+
+async function onScanSuccess(decodedText) {
+  if (isCooldown) return;
+  isCooldown = true;
+
+  const statusBox = document.getElementById("status");
+  statusBox.className = "";
+  statusBox.innerText = "ပို့နေသည်: " + decodedText;
+
+  try {
+    const res = await fetch("/api/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: decodedText, branch_code: BRANCH_CODE })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      playBeep();
+      statusBox.className = "ok";
+      statusBox.innerText = `✓ ${data.product.name} (${data.product.price.toLocaleString()} Ks)`;
+    } else {
+      statusBox.className = "err";
+      statusBox.innerText = "✗ " + (data.message || "မတွေ့ပါ");
+    }
+  } catch (err) {
+    statusBox.className = "err";
+    statusBox.innerText = "Server နှင့် ချိတ်ဆက်မရပါ";
+  }
+
+  setTimeout(() => { isCooldown = false; }, 1500);
+}
+
+async function toggleCamera() {
+  const btn = document.getElementById("toggle-btn");
+  const statusBox = document.getElementById("status");
+
+  if (!isScanning) {
+    try {
+      document.getElementById("reader").innerText = "";
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess
+      );
+      isScanning = true;
+      await setWakeLock(true);
+      btn.innerText = "ကင်မရာ ခဏပိတ်မယ်";
+      btn.className = "stop";
+      statusBox.className = "";
+      statusBox.innerText = "QR / Barcode ကို ကင်မရာရှေ့ပြပါ...";
+    } catch (err) {
+      statusBox.className = "err";
+      statusBox.innerText = "ကင်မရာဖွင့်မရပါ: " + err;
+    }
+  } else {
+    try {
+      await html5QrCode.stop();
+      isScanning = false;
+      await setWakeLock(false);
+      document.getElementById("reader").innerText = "ကင်မရာ ပိတ်ထားပါသည်";
+      btn.innerText = "ကင်မရာ ဖွင့်မယ်";
+      btn.className = "";
+      statusBox.className = "";
+      statusBox.innerText = "Scan ဖတ်ရန် ခလုတ်ကို ပြန်နှိပ်ပါ";
+    } catch (err) {}
+  }
+}
+</script>
+</body>
+</html>

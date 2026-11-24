@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<title>POS - {{ branch.name }}</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+  body { font-family: 'Segoe UI', Pyidaungsu, sans-serif; margin: 0; background: #f4f6f9; color: #222; }
+  .navbar { background: #1e293b; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+  .navbar a { color: #fff; text-decoration: none; margin-left: 12px; padding: 6px 12px; border-radius: 6px; background: #334155; font-size: 14px; }
+  .navbar a:hover { background: #475569; }
+  .branch-badge { background: #2563eb; padding: 4px 12px; border-radius: 20px; font-size: 14px; margin-left: 8px; }
+  .container { display: flex; gap: 20px; padding: 20px; max-width: 1200px; margin: auto; }
+  .left { flex: 2; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .right { flex: 1; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; gap: 14px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border-bottom: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+  th { background: #f8fafc; }
+  .qty-btn { padding: 3px 9px; cursor: pointer; border: 1px solid #cbd5e1; background: #fff; border-radius: 4px; }
+  .del-btn { background: #ef4444; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+  .total-box { font-size: 24px; font-weight: bold; color: #0f766e; display: flex; justify-content: space-between; border-top: 2px solid #e2e8f0; padding-top: 12px; }
+  input[type="number"], input[type="text"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 16px; }
+  .btn-pay { width: 100%; padding: 14px; background: #16a34a; color: #fff; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; }
+  .btn-pay:hover { background: #15803d; }
+
+  /* PC Webcam Box */
+  .cam-box { background: #0f172a; color: #fff; padding: 12px; border-radius: 8px; text-align: center; }
+  #webcam-reader { width: 100%; border-radius: 6px; overflow: hidden; margin: 8px 0; }
+  #webcam-status { font-size: 13px; color: #cbd5e1; margin-bottom: 8px; min-height: 18px; }
+  .btn-cam { width: 100%; padding: 9px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: #fff; background: #2563eb; }
+  .btn-cam.stop { background: #dc2626; }
+
+  .qr-box { text-align: center; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px dashed #94a3b8; }
+  .qr-box img { width: 110px; height: 110px; }
+  .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #22c55e; margin-right: 6px; }
+
+  /* ဘောင်ချာ Print ထုတ်ရန် ဒီဇိုင်း */
+  #receipt-area { display: none; }
+  @media print {
+    body * { visibility: hidden; }
+    #receipt-area, #receipt-area * { visibility: visible; }
+    #receipt-area {
+      display: block;
+      position: absolute; left: 0; top: 0; width: 58mm;
+      font-family: monospace, sans-serif; font-size: 12px; color: #000;
+    }
+    .r-center { text-align: center; }
+    .r-line { border-top: 1px dashed #000; margin: 6px 0; }
+    .r-row { display: flex; justify-content: space-between; }
+  }
+</style>
+</head>
+<body>
+
+<div class="navbar">
+  <div>
+    <strong>POS အရောင်းကောင်တာ</strong>
+    <span class="branch-badge">{{ branch.name }}</span>
+    &nbsp; <span style="font-size:13px;"><span class="status-dot"></span>Online ချိတ်ဆက်ပြီး</span>
+  </div>
+  <div>
+    <a href="/">ဆိုင်ခွဲပြောင်းရန်</a>
+    <a href="/admin">Admin စီမံခန့်ခွဲမှု</a>
+  </div>
+</div>
+
+<div class="container">
+  <div class="left">
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+      <input type="text" id="manualCode" placeholder="ပစ္စည်းကုတ် ရိုက်ထည့်ပြီး Enter ခေါက်နိုင်သည် (ဥပမာ P0001)">
+      <button onclick="manualAdd()" style="padding:0 18px; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer;">ထည့်မယ်</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ကုတ်</th>
+          <th>ပစ္စည်းအမည်</th>
+          <th>ဈေးနှုန်း</th>
+          <th>အရေအတွက်</th>
+          <th>သင့်ငွေ</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="cart-body"></tbody>
+    </table>
+  </div>
+
+  <div class="right">
+    <div class="total-box">
+      <span>စုစုပေါင်း:</span>
+      <span id="total-amt">0 ကျပ်</span>
+    </div>
+
+    <div>
+      <label>ပေးငွေ (ကျပ်)</label>
+      <input type="number" id="cash-received" placeholder="0" oninput="calcChange()">
+    </div>
+
+    <div style="display:flex; justify-content:space-between; font-size:18px; font-weight:bold;">
+      <span>ပြန်အမ်းငွေ:</span>
+      <span id="change-amt" style="color:#dc2626;">0 ကျပ်</span>
+    </div>
+
+    <button class="btn-pay" onclick="checkout()">ငွေရှင်းပြီး ဘောင်ချာထုတ်မယ်</button>
+    <button onclick="clearCart()" style="padding:8px; background:#e2e8f0; border:none; border-radius:6px; cursor:pointer;">စာရင်းရှင်းမယ်</button>
+
+    <!-- PC Webcam Scanner -->
+    <div class="cam-box">
+      <div style="font-weight:bold; font-size:14px;">PC Webcam Scanner</div>
+      <div id="webcam-reader"></div>
+      <div id="webcam-status">Webcam ဖြင့် Scan ဖတ်ရန် ခလုတ်နှိပ်ပါ</div>
+      <button id="webcam-btn" class="btn-cam" onclick="toggleWebcam()">Webcam ဖွင့်မယ်</button>
+    </div>
+
+    <!-- Phone Wireless Scanner QR -->
+    <div class="qr-box">
+      <div style="font-weight:bold; font-size:13px; margin-bottom:4px;">ဖုန်းဖြင့် ဖတ်လိုပါက Scan ဖတ်ပါ</div>
+      <img src="{{ scanner_qr }}" alt="Scanner QR">
+      <div style="font-size:10px; color:#475569; word-break:break-all;">{{ scanner_url }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ဘောင်ချာ Print ထုတ်မည့်အပိုင်း -->
+<div id="receipt-area">
+  <div class="r-center">
+    <h3 style="margin:2px 0;">MY SHOP POS</h3>
+    <div><strong>{{ branch.name }}</strong></div>
+    <div id="r-no"></div>
+    <div id="r-time"></div>
+  </div>
+  <div class="r-line"></div>
+  <div id="r-items"></div>
+  <div class="r-line"></div>
+  <div class="r-row"><strong>စုစုပေါင်း</strong><strong id="r-total"></strong></div>
+  <div class="r-row"><span>ပေးငွေ</span><span id="r-cash"></span></div>
+  <div class="r-row"><span>ပြန်အမ်းငွေ</span><span id="r-change"></span></div>
+  <div class="r-line"></div>
+  <div class="r-center">ဝယ်ယူအားပေးမှုကို ကျေးဇူးတင်ပါသည်။</div>
+</div>
+
+<script>
+const BRANCH_CODE = "{{ branch.code }}";
+let cart = [];
+let webcamScanner = null;
+let isWebcamRunning = false;
+let scanCooldown = false;
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(1000, ctx.currentTime);
+    osc.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1);
+  } catch(e) {}
+}
+
+// ဖုန်း Scanner (သို့မဟုတ်) Webcam မှ ပို့လိုက်သည်ကို လက်ခံခြင်း
+const evtSource = new EventSource("/stream/" + BRANCH_CODE);
+evtSource.onmessage = function(e) {
+  const product = JSON.parse(e.data);
+  addToCart(product);
+  playBeep();
+};
+
+// PC Webcam ဖွင့်/ပိတ်
+async function toggleWebcam() {
+  const btn = document.getElementById("webcam-btn");
+  const statusEl = document.getElementById("webcam-status");
+
+  if (!isWebcamRunning) {
+    try {
+      const cameras = await Html5Qrcode.getCameras();
+      if (!cameras || cameras.length === 0) {
+        statusEl.innerText = "ကွန်ပျူတာတွင် Webcam မတွေ့ပါ";
+        return;
+      }
+      if (!webcamScanner) {
+        webcamScanner = new Html5Qrcode("webcam-reader");
+      }
+      await webcamScanner.start(
+        cameras[0].id,
+        { fps: 10, qrbox: { width: 180, height: 180 } },
+        onWebcamScanSuccess
+      );
+      isWebcamRunning = true;
+      btn.innerText = "Webcam ခဏပိတ်မယ်";
+      btn.classList.add("stop");
+      statusEl.innerText = "QR Code ကို Webcam ရှေ့ပြပါ...";
+    } catch (err) {
+      statusEl.innerText = "Webcam ဖွင့်မရပါ: " + err;
+    }
+  } else {
+    try {
+      await webcamScanner.stop();
+      isWebcamRunning = false;
+      btn.innerText = "Webcam ဖွင့်မယ်";
+      btn.classList.remove("stop");
+      statusEl.innerText = "Webcam ပိတ်ထားပါသည်";
+    } catch (e) {}
+  }
+}
+
+async function onWebcamScanSuccess(decodedText) {
+  if (scanCooldown) return;
+  scanCooldown = true;
+  const statusEl = document.getElementById("webcam-status");
+
+  try {
+    const res = await fetch("/api/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: decodedText, branch_code: BRANCH_CODE })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      statusEl.innerText = `✓ ${data.product.name} (${data.product.price.toLocaleString()} Ks)`;
+    } else {
+      statusEl.innerText = `✗ ကုတ် (${decodedText}) မတွေ့ပါ`;
+    }
+  } catch (e) {
+    statusEl.innerText = "Server ချိတ်ဆက်မှု ပြတ်တောက်နေသည်";
+  }
+
+  setTimeout(() => { scanCooldown = false; }, 1500);
+}
+
+function addToCart(product) {
+  const existing = cart.find(i => i.code === product.code);
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    cart.push({ ...product, qty: 1 });
+  }
+  renderCart();
+}
+
+function renderCart() {
+  const tbody = document.getElementById("cart-body");
+  tbody.innerHTML = "";
+  let total = 0;
+  cart.forEach((item, idx) => {
+    const sub = item.qty * item.price;
+    total += sub;
+    tbody.innerHTML += `
+      <tr>
+        <td>${item.code}</td>
+        <td>${item.name}</td>
+        <td>${item.price.toLocaleString()}</td>
+        <td>
+          <button class="qty-btn" onclick="changeQty(${idx}, -1)">-</button>
+          <span style="margin:0 8px;">${item.qty}</span>
+          <button class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
+        </td>
+        <td>${sub.toLocaleString()}</td>
+        <td><button class="del-btn" onclick="removeItem(${idx})">x</button></td>
+      </tr>`;
+  });
+  document.getElementById("total-amt").innerText = total.toLocaleString() + " ကျပ်";
+  calcChange();
+}
+
+function changeQty(idx, delta) {
+  cart[idx].qty += delta;
+  if (cart[idx].qty <= 0) cart.splice(idx, 1);
+  renderCart();
+}
+
+function removeItem(idx) {
+  cart.splice(idx, 1);
+  renderCart();
+}
+
+function clearCart() {
+  cart = [];
+  document.getElementById("cash-received").value = "";
+  renderCart();
+}
+
+function getTotal() {
+  return cart.reduce((sum, i) => sum + i.qty * i.price, 0);
+}
+
+function calcChange() {
+  const total = getTotal();
+  const cash = parseInt(document.getElementById("cash-received").value) || 0;
+  const change = Math.max(0, cash - total);
+  document.getElementById("change-amt").innerText = change.toLocaleString() + " ကျပ်";
+}
+
+async function manualAdd() {
+  const input = document.getElementById("manualCode");
+  const code = input.value.trim();
+  if (!code) return;
+  const res = await fetch("/api/scan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, branch_code: BRANCH_CODE })
+  });
+  if (!res.ok) alert("ပစ္စည်းကုတ် မတွေ့ပါ");
+  input.value = "";
+}
+
+document.getElementById("manualCode").addEventListener("keypress", e => {
+  if (e.key === "Enter") manualAdd();
+});
+
+async function checkout() {
+  if (cart.length === 0) return alert("ပစ္စည်းအရင်ထည့်ပါ");
+  const total = getTotal();
+  const cash = parseInt(document.getElementById("cash-received").value) || total;
+  const change = Math.max(0, cash - total);
+
+  const res = await fetch("/api/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cart, branch_code: BRANCH_CODE })
+  });
+  const data = await res.json();
+  if (data.status === "ok") {
+    document.getElementById("r-no").innerText = data.receipt_no;
+    document.getElementById("r-time").innerText = data.sale_time;
+    document.getElementById("r-items").innerHTML = cart.map(i => `
+      <div>${i.name}</div>
+      <div class="r-row"><span>${i.qty} x ${i.price.toLocaleString()}</span><span>${(i.qty * i.price).toLocaleString()}</span></div>
+    `).join("");
+    document.getElementById("r-total").innerText = total.toLocaleString() + " Ks";
+    document.getElementById("r-cash").innerText = cash.toLocaleString() + " Ks";
+    document.getElementById("r-change").innerText = change.toLocaleString() + " Ks";
+
+    window.print();
+    clearCart();
+  }
+}
+</script>
+</body>
+</html>
