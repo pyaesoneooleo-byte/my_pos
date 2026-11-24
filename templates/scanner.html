@@ -52,10 +52,7 @@ async function loadCameras() {
   if (!cameras || cameras.length === 0) {
     throw new Error("ဖုန်းထဲတွင် Camera မတွေ့ပါ");
   }
-  // နောက်ကင်မရာ (back / rear / environment) ရှိရင် အရင်ရွေးထားမယ်
-  const backIdx = cameras.findIndex(c =>
-    /back|rear|environment/i.test(c.label)
-  );
+  const backIdx = cameras.findIndex(c => /back|rear|environment/i.test(c.label));
   currentCamIndex = backIdx !== -1 ? backIdx : cameras.length - 1;
   return cameras;
 }
