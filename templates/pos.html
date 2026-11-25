@@ -74,10 +74,35 @@
 </div>
 
 <script>
-  const BRANCH_CODE = "{{ branch.code }}";
+const BRANCH_CODE = "{{ branch.code }}";
   let cart = [];
 
-  // Enter နှိပ်ရင် တန်းထည့်မယ်
+  // Supermarket Barcode Scanner "တီ" အသံ ထုတ်ပေးမည့် Function
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  function playBeep(type = "ok") {
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    if (type === "ok") {
+      // အောင်မြင်ရင် "တီ" (1200Hz ကြည်လင်သော အသံ)
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.12);
+    } else {
+      // ကုတ်မှားရင် "တူ" (300Hz အသံနိမ့်)
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.25);
+    }
+  }
+
   document.getElementById("codeInput").addEventListener("keypress", function(e) {
     if (e.key === "Enter") manualAdd();
   });
@@ -99,10 +124,14 @@
     .then(r => r.json())
     .then(res => {
       if (res.status !== "ok") {
+        playBeep("err");
         alert(res.message || "ပစ္စည်းမတွေ့ပါ");
       }
     })
-    .catch(err => alert("ချိတ်ဆက်မှု Error: " + err));
+    .catch(err => {
+      playBeep("err");
+      alert("ချိတ်ဆက်မှု Error: " + err);
+    });
   }
 
   function addItemToCart(prod) {
@@ -113,6 +142,7 @@
       cart.push({ code: prod.code, name: prod.name, price: prod.price, qty: 1 });
     }
     renderCart();
+    playBeep("ok"); // ဇယားထဲ ပစ္စည်းဝင်သည်နှင့် "တီ" မြည်မည်
   }
 
   function changeQty(idx, delta) {
@@ -151,7 +181,6 @@
     document.getElementById("grandTotal").innerText = total.toLocaleString();
   }
 
-  // Real-time SSE (ဖုန်း သို့မဟုတ် PC မှ Scan ဖတ်လိုက်သည်နှင့် ဇယားထဲ တန်းဝင်မည်)
   const evtSource = new EventSource(`/stream/${BRANCH_CODE}`);
   evtSource.onmessage = function(e) {
     const prod = JSON.parse(e.data);
@@ -168,16 +197,17 @@
     .then(r => r.json())
     .then(res => {
       if (res.status === "ok") {
+        playBeep("ok");
         alert(`ငွေရှင်းပြီးပါပြီ!\nဘောင်ချာ: ${res.receipt_no}`);
         cart = [];
         renderCart();
       } else {
+        playBeep("err");
         alert(res.message);
       }
     });
   }
 
-  // PC Webcam Scanner
   let lastScan = 0;
   const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 200 });
   html5QrcodeScanner.render((decodedText) => {
