@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ branch.name }} - စာရင်းများ</title>
+  <style>
+    body { font-family: 'Segoe UI', Pyidaungsu, sans-serif; background: #f1f5f9; margin: 0; padding: 15px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: #fff; padding: 12px 20px; border-radius: 10px; margin-bottom: 15px; }
+    .topbar a { background: #2563eb; color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+    .tab-btn { padding: 10px 18px; border: none; border-radius: 8px; background: #cbd5e1; font-size: 15px; font-weight: bold; cursor: pointer; }
+    .tab-btn.active { background: #2563eb; color: #fff; }
+    .card { background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: none; overflow-x: auto; }
+    .card.active { display: block; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    th { background: #f8fafc; }
+    .badge-low { background: #fee2e2; color: #b91c1c; padding: 3px 8px; border-radius: 6px; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div><strong>📊 {{ branch.name }} - သီးသန့်စာရင်းများ</strong></div>
+  <a href="/pos/{{ branch.code }}">← POS ကောင်တာသို့ ပြန်သွားရန်</a>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="openTab('stockTab', this)">📦 လက်ကျန်စာရင်း</button>
+  <button class="tab-btn" onclick="openTab('salesTab', this)">💰 အရောင်းစာရင်း ({{ "{:,}".format(total_sales_amt) }} ကျပ်)</button>
+  <button class="tab-btn" onclick="openTab('inTab', this)">📥 အဝင်စာရင်း</button>
+  <button class="tab-btn" onclick="openTab('dmgTab', this)">⚠️ အပျက်စာရင်း</button>
+</div>
+
+<!-- ၁။ လက်ကျန်စာရင်း -->
+<div id="stockTab" class="card active">
+  <h3>{{ branch.name }} - လက်ကျန်ပစ္စည်းစာရင်း</h3>
+  <table>
+    <thead><tr><th>ကုတ်</th><th>ပစ္စည်းအမည်</th><th>ရောင်းဈေး</th><th>လက်ကျန်</th><th>တန်ဖိုး</th></tr></thead>
+    <tbody>
+      {% for s in stocks %}
+      <tr>
+        <td>{{ s.code }}</td>
+        <td>{{ s.name }}</td>
+        <td>{{ "{:,}".format(s.price) }}</td>
+        <td>{% if s.stock <= 5 %}<span class="badge-low">{{ s.stock }}</span>{% else %}{{ s.stock }}{% endif %}</td>
+        <td>{{ "{:,}".format(s.total_val) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ၂။ အရောင်းစာရင်း -->
+<div id="salesTab" class="card">
+  <h3>{{ branch.name }} - အရောင်းစာရင်း</h3>
+  <table>
+    <thead><tr><th>အချိန်</th><th>ဘောင်ချာ</th><th>ကုတ်</th><th>ပစ္စည်းအမည်</th><th>ခု</th><th>ဈေးနှုန်း</th><th>သင့်ငွေ</th></tr></thead>
+    <tbody>
+      {% for r in sales %}
+      <tr>
+        <td>{{ r.sale_time }}</td>
+        <td>{{ r.receipt_no }}</td>
+        <td>{{ r.code }}</td>
+        <td>{{ r.name }}</td>
+        <td>{{ r.qty }}</td>
+        <td>{{ "{:,}".format(r.price) }}</td>
+        <td>{{ "{:,}".format(r.subtotal) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ၃။ အဝင်စာရင်း -->
+<div id="inTab" class="card">
+  <h3>{{ branch.name }} - ပစ္စည်းအဝင်စာရင်း</h3>
+  <table>
+    <thead><tr><th>အချိန်</th><th>ကုတ်</th><th>ပစ္စည်းအမည်</th><th>အဝင်အရေအတွက်</th><th>ကျန်ရှိလက်ကျန်</th><th>မှတ်ချက်</th></tr></thead>
+    <tbody>
+      {% for l in in_logs %}
+      <tr>
+        <td>{{ l.log_time }}</td>
+        <td>{{ l.code }}</td>
+        <td>{{ l.name }}</td>
+        <td style="color:#16a34a; font-weight:bold;">+{{ l.qty_change }}</td>
+        <td>{{ l.balance_after }}</td>
+        <td>{{ l.note }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ၄။ အပျက်စာရင်း -->
+<div id="dmgTab" class="card">
+  <h3>{{ branch.name }} - အပျက်အစီးစာရင်း</h3>
+  <table>
+    <thead><tr><th>အချိန်</th><th>ကုတ်</th><th>ပစ္စည်းအမည်</th><th>အပျက်အရေအတွက်</th><th>ကျန်ရှိလက်ကျန်</th><th>မှတ်ချက်</th></tr></thead>
+    <tbody>
+      {% for d in dmg_logs %}
+      <tr>
+        <td>{{ d.log_time }}</td>
+        <td>{{ d.code }}</td>
+        <td>{{ d.name }}</td>
+        <td style="color:#dc2626; font-weight:bold;">{{ d.qty_change }}</td>
+        <td>{{ d.balance_after }}</td>
+        <td>{{ d.note }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  function openTab(tabId, btn) {
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+</body>
+</html>
