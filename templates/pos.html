@@ -39,6 +39,9 @@
 <div class="topbar">
   <div><strong>🏪 {{ branch.name }}</strong> | POS အရောင်းကောင်တာ</div>
   <div class="nav-links">
+    {% if is_admin %}
+    <a href="/admin" style="background:#0f766e;">⚙️ Admin သို့ ပြန်သွားရန်</a>
+    {% endif %}
     <a href="/pos/{{ branch.code }}/reports" style="background:#0284c7;">📊 ဆိုင်ခွဲစာရင်းများ</a>
     <a href="/pos/{{ branch.code }}/logout" style="background:#dc2626;">🔒 Lock / ထွက်မည်</a>
   </div>
