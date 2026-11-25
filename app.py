@@ -257,7 +257,7 @@ def pos_page(branch_code):
         branch=branch,
         products=product_list,
         scanner_url=scanner_url,
-        scanner_qr=scanner_qr
+        scanner_qr=scanner_qr,
         is_admin=session.get("is_admin", False)
     )
 
