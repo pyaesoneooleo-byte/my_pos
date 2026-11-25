@@ -1,596 +1,388 @@
 <!DOCTYPE html>
 <html lang="my">
 <head>
-<meta charset="UTF-8">
-<title>Admin - Multi-Branch POS</title>
-<style>
-  body { font-family: 'Segoe UI', Pyidaungsu, sans-serif; margin: 0; background: #f4f6f9; color: #1e293b; }
-  .navbar { background: #1e293b; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-  .navbar a { color: #fff; text-decoration: none; background: #334155; padding: 6px 12px; border-radius: 6px; margin-left: 8px; font-size: 14px; }
-  .navbar a:hover { background: #475569; }
-
-  .wrap { max-width: 1200px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-
-  /* Tabs */
-  .tabs { display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px; padding-bottom: 12px; }
-  .tab-btn {
-    padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer;
-    font-size: 14px; font-weight: bold; background: #e2e8f0; color: #334155;
-  }
-  .tab-btn.active { background: #2563eb; color: #fff; }
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
-
-  /* Summary Cards */
-  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
-  .card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 10px; }
-  .card-title { font-size: 13px; color: #64748b; margin-bottom: 6px; }
-  .card-val { font-size: 22px; font-weight: bold; color: #0f172a; }
-  .card-val.red { color: #dc2626; }
-  .card-val.green { color: #15803d; }
-  .card-val.blue { color: #2563eb; }
-
-  .form-row { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
-  input[type="text"], input[type="number"], select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; }
-  button { padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-  .btn-add { background: #2563eb; color: #fff; }
-  .btn-print { background: #0f766e; color: #fff; }
-  .btn-edit { background: #0284c7; color: #fff; padding: 5px 10px; font-size: 13px; }
-  .btn-in { background: #16a34a; color: #fff; padding: 5px 10px; font-size: 13px; }
-  .btn-dmg { background: #f59e0b; color: #fff; padding: 5px 10px; font-size: 13px; }
-  .btn-del { background: #ef4444; color: #fff; padding: 5px 10px; font-size: 13px; }
-  .btn-filter { background: #e2e8f0; color: #1e293b; }
-  .btn-filter.active { background: #dc2626; color: #fff; }
-
-  table { width: 100%; border-collapse: collapse; }
-  th, td { border-bottom: 1px solid #e2e8f0; padding: 10px; text-align: left; vertical-align: middle; }
-  th { background: #f8fafc; }
-  .qr-thumb { width: 50px; height: 50px; }
-  .branch-pill { background: #e0e7ff; color: #1e40af; padding: 3px 10px; border-radius: 12px; font-size: 13px; font-weight: bold; }
-  .stock-badge { padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 14px; display: inline-block; }
-  .stock-ok { background: #dcfce7; color: #166534; }
-  .stock-low { background: #fee2e2; color: #b91c1c; }
-  .tag-in { color: #15803d; font-weight: bold; }
-  .tag-dmg { color: #d97706; font-weight: bold; }
-
-  /* A4 Sticker Print ထုတ်ရန် ဒီဇိုင်း */
-  #sticker-sheet { display: none; }
-  @media print {
-    body * { visibility: hidden; }
-    #sticker-sheet, #sticker-sheet * { visibility: visible; }
-    #sticker-sheet {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      position: absolute; left: 0; top: 0; width: 100%;
-    }
-    .sticker-card {
-      border: 1px dashed #666;
-      padding: 8px;
-      text-align: center;
-      page-break-inside: avoid;
-      border-radius: 4px;
-    }
-    .sticker-card img { width: 85px; height: 85px; }
-    .st-name { font-size: 13px; font-weight: bold; margin-top: 2px; }
-    .st-price { font-size: 15px; font-weight: bold; }
-    .st-code { font-size: 11px; color: #555; }
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin စီမံခန့်ခွဲမှု - Multi-Branch POS</title>
+  <style>
+    body { font-family: 'Segoe UI', Pyidaungsu, sans-serif; background: #f1f5f9; margin: 0; padding: 15px; color: #0f172a; }
+    .topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: #0f172a; color: #fff; padding: 14px 20px; border-radius: 10px; margin-bottom: 15px; }
+    .topbar a { color: #fff; text-decoration: none; padding: 8px 14px; border-radius: 6px; font-size: 14px; font-weight: bold; margin-left: 6px; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+    .tab-btn { padding: 10px 18px; border: none; border-radius: 8px; background: #cbd5e1; font-size: 15px; font-weight: bold; cursor: pointer; }
+    .tab-btn.active { background: #2563eb; color: #fff; }
+    .card { background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); margin-bottom: 15px; display: none; overflow-x: auto; }
+    .card.active { display: block; }
+    .form-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; align-items: center; }
+    input, select { padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
+    button { padding: 10px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; }
+    .btn-blue { background: #2563eb; color: #fff; }
+    .btn-green { background: #16a34a; color: #fff; }
+    .btn-amber { background: #d97706; color: #fff; }
+    .btn-red { background: #dc2626; color: #fff; padding: 6px 10px; font-size: 13px; }
+    .btn-sm { padding: 6px 12px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: middle; }
+    th { background: #f8fafc; }
+    .pw-input { width: 120px; padding: 6px 10px; font-weight: bold; letter-spacing: 1px; }
+    .qr-img { width: 64px; height: 64px; border: 1px solid #e2e8f0; border-radius: 4px; }
+    .badge-low { background: #fee2e2; color: #b91c1c; padding: 3px 8px; border-radius: 6px; font-weight: bold; }
+  </style>
 </head>
 <body>
 
-<div class="navbar">
-  <strong>Admin စီမံခန့်ခွဲမှု (ဆိုင်ခွဲ {{ branches|length }} ခု)</strong>
+<div class="topbar">
+  <div><strong>⚙️ Admin စီမံခန့်ခွဲမှု Dashboard</strong></div>
   <div>
-    <a href="/">ဆိုင်ခွဲကောင်တာများသို့</a>
-    <a href="/api/export_excel">Excel စာရင်းအစုံ ဒေါင်းမယ်</a>
-    <a href="/admin/logout" style="background:#b91c1c;">Logout</a>
+    <a href="/api/export_excel" style="background:#16a34a;">📥 Excel ဒေါင်းမည်</a>
+    <a href="/" style="background:#334155;">🏪 ဆိုင်ခွဲများသို့</a>
+    <a href="/admin/logout" style="background:#dc2626;">ထွက်မည် (Logout)</a>
   </div>
 </div>
 
-<div class="wrap">
-  <!-- Tab ခလုတ် (၆) ခု -->
-  <div class="tabs">
-    <button class="tab-btn active" id="btn-tab-products" onclick="switchTab('products')">ပစ္စည်းနှင့် Sticker</button>
-    <button class="tab-btn" id="btn-tab-stock" onclick="switchTab('stock')">လက်ကျန်စာရင်း</button>
-    <button class="tab-btn" id="btn-tab-sales" onclick="switchTab('sales')">အရောင်းစာရင်း</button>
-    <button class="tab-btn" id="btn-tab-in" onclick="switchTab('in')">အဝင်စာရင်း</button>
-    <button class="tab-btn" id="btn-tab-damage" onclick="switchTab('damage')">အပျက်စာရင်း</button>
-    <button class="tab-btn" id="btn-tab-branches" onclick="switchTab('branches')">ဆိုင်ခွဲများ (1,2,3...)</button>
-  </div>
-
-  <!-- TAB 1: ပစ္စည်းနှင့် Sticker -->
-  <div id="tab-products" class="tab-content active">
-    <h3>ပစ္စည်းအသစ်ထည့်မယ် (ဆိုင်ခွဲအားလုံးအတွက် ဈေးနှုန်းတူသတ်မှတ်ရန်)</h3>
-    <div class="form-row">
-      <input type="text" id="p-name" placeholder="ပစ္စည်းအမည် (ဥပမာ - ကော်ဖီမစ်)" style="flex:2;">
-      <input type="number" id="p-price" placeholder="ရောင်းဈေး (ကျပ်)" style="flex:1;">
-      <input type="number" id="p-stock" placeholder="ဆိုင်ခွဲတိုင်း စတင်လက်ကျန်" value="0" min="0" style="flex:1;">
-      <input type="text" id="p-code" placeholder="ကုတ် (မထည့်လည်း Auto)" style="flex:1;">
-      <button class="btn-add" onclick="addProduct()">+ ပစ္စည်းထည့်မယ်</button>
-    </div>
-
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
-      <h3>ပစ္စည်းစာရင်းနှင့် Sticker ထုတ်ရန်</h3>
-      <div style="display:flex; align-items:center; gap:12px;">
-        <label style="font-size:14px; cursor:pointer;">
-          <input type="checkbox" id="include-price"> Sticker ပေါ်တွင် ဈေးနှုန်းထည့်မည်
-        </label>
-        <button class="btn-print" onclick="printStickers()">Sticker Print ထုတ်မယ်</button>
-      </div>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th>QR</th>
-          <th>ကုတ်</th>
-          <th>ပစ္စည်းအမည်</th>
-          <th>ရောင်းဈေး (ဆိုင်အားလုံး)</th>
-          <th>ဆိုင်ပေါင်းလက်ကျန်</th>
-          <th>Sticker အရေအတွက်</th>
-          <th>ပြင် / ဖျက်</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in products %}
-        <tr>
-          <td><img src="{{ p.qr }}" class="qr-thumb"></td>
-          <td><strong>{{ p.code }}</strong></td>
-          <td>{{ p.name }}</td>
-          <td><strong>{{ "{:,}".format(p.price) }} Ks</strong></td>
-          <td>{{ p.total_stock }} ခု</td>
-          <td>
-            <input type="number" min="0" value="0" style="width:65px;"
-              class="print-qty"
-              data-code="{{ p.code }}"
-              data-name="{{ p.name }}"
-              data-price="{{ p.price }}"
-              data-qr="{{ p.qr }}">
-          </td>
-          <td>
-            <button class="btn-edit" data-id="{{ p.id }}" data-name="{{ p.name }}" data-price="{{ p.price }}" onclick="editPrice(this)">ဈေးပြင်</button>
-            <button class="btn-del" data-id="{{ p.id }}" onclick="deleteProduct(this)">ဖျက်</button>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- TAB 2: ဆိုင်ခွဲအလိုက် လက်ကျန်စာရင်း -->
-  <div id="tab-stock" class="tab-content">
-    <div class="form-row">
-      <label><strong>ဆိုင်ခွဲ ရွေးရန်:</strong></label>
-      <select id="stock-branch-filter" onchange="filterStockTable()">
-        <option value="ALL">ဆိုင်ခွဲအားလုံး</option>
-        {% for b in branches %}
-        <option value="{{ b.id }}">{{ b.name }}</option>
-        {% endfor %}
-      </select>
-      <input type="text" id="stock-search" placeholder="ပစ္စည်းအမည် သို့မဟုတ် ကုတ်ဖြင့် ရှာရန်..." style="flex:1;" oninput="filterStockTable()">
-      <button class="btn-filter" id="btn-low-only" onclick="toggleLowOnly()">လက်ကျန်နည်းတာပဲ ကြည့်မယ် (≤5)</button>
-    </div>
-
-    <div class="summary-grid">
-      <div class="card">
-        <div class="card-title">စုစုပေါင်း လက်ကျန်အရေအတွက်</div>
-        <div class="card-val" id="sum-stock-qty">0 ခု</div>
-      </div>
-      <div class="card">
-        <div class="card-title">လက်ကျန်နည်းနေသော စာရင်း (≤5)</div>
-        <div class="card-val red" id="low-stock-count">0 ခု</div>
-      </div>
-      <div class="card">
-        <div class="card-title">စုစုပေါင်း လက်ကျန်တန်ဖိုး</div>
-        <div class="card-val green" id="total-stock-val">0 Ks</div>
-      </div>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th>ဆိုင်ခွဲ</th>
-          <th>ကုတ်</th>
-          <th>ပစ္စည်းအမည်</th>
-          <th>တစ်ခုဈေး</th>
-          <th>လက်ကျန်</th>
-          <th>လက်ကျန်တန်ဖိုး</th>
-          <th>Stock အတိုး/အလျော့</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for sr in stock_rows %}
-        <tr class="stock-row"
-            data-branch-id="{{ sr.branch_id }}"
-            data-name="{{ sr.name|lower }}"
-            data-code="{{ sr.code|lower }}"
-            data-stock="{{ sr.stock }}"
-            data-val="{{ sr.price * sr.stock }}">
-          <td><span class="branch-pill">{{ sr.branch_name }}</span></td>
-          <td><strong>{{ sr.code }}</strong></td>
-          <td>{{ sr.name }}</td>
-          <td>{{ "{:,}".format(sr.price) }} Ks</td>
-          <td>
-            <span class="stock-badge {{ 'stock-low' if sr.stock <= 5 else 'stock-ok' }}">{{ sr.stock }} ခု</span>
-          </td>
-          <td><strong>{{ "{:,}".format(sr.price * sr.stock) }} Ks</strong></td>
-          <td>
-            <button class="btn-in"
-              data-branch-id="{{ sr.branch_id }}"
-              data-branch-name="{{ sr.branch_name }}"
-              data-product-id="{{ sr.product_id }}"
-              data-name="{{ sr.name }}"
-              onclick="adjustStock(this, 'in')">+ အဝင်</button>
-            <button class="btn-dmg"
-              data-branch-id="{{ sr.branch_id }}"
-              data-branch-name="{{ sr.branch_name }}"
-              data-product-id="{{ sr.product_id }}"
-              data-name="{{ sr.name }}"
-              onclick="adjustStock(this, 'damage')">- အပျက်</button>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- TAB 3: အရောင်းစာရင်း -->
-  <div id="tab-sales" class="tab-content">
-    <div class="form-row">
-      <label><strong>ဆိုင်ခွဲ ရွေးရန်:</strong></label>
-      <select id="sales-branch-filter" onchange="filterSimpleTable('sales')">
-        <option value="ALL">ဆိုင်ခွဲအားလုံး</option>
-        {% for b in branches %}
-        <option value="{{ b.name }}">{{ b.name }}</option>
-        {% endfor %}
-      </select>
-      <div style="margin-left:auto; font-size:18px; font-weight:bold; color:#2563eb;">
-        စုစုပေါင်း ရောင်းရငွေ: <span id="filtered-sales-total">0 Ks</span>
-      </div>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th>ဆိုင်ခွဲ</th>
-          <th>ရက်စွဲနှင့်အချိန်</th>
-          <th>ဘောင်ချာနံပါတ်</th>
-          <th>ကုတ်</th>
-          <th>ပစ္စည်းအမည်</th>
-          <th>အရေအတွက်</th>
-          <th>တစ်ခုဈေး</th>
-          <th>စုစုပေါင်း</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for s in sales %}
-        <tr class="sales-row" data-branch="{{ s.branch_name }}" data-subtotal="{{ s.subtotal }}">
-          <td><span class="branch-pill">{{ s.branch_name }}</span></td>
-          <td style="font-size:13px;">{{ s.sale_time }}</td>
-          <td>{{ s.receipt_no }}</td>
-          <td>{{ s.code }}</td>
-          <td>{{ s.name }}</td>
-          <td>{{ s.qty }} ခု</td>
-          <td>{{ "{:,}".format(s.price) }} Ks</td>
-          <td><strong>{{ "{:,}".format(s.subtotal) }} Ks</strong></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- TAB 4: အဝင်စာရင်း -->
-  <div id="tab-in" class="tab-content">
-    <div class="form-row">
-      <label><strong>ဆိုင်ခွဲ ရွေးရန်:</strong></label>
-      <select id="in-branch-filter" onchange="filterSimpleTable('in')">
-        <option value="ALL">ဆိုင်ခွဲအားလုံး</option>
-        {% for b in branches %}
-        <option value="{{ b.name }}">{{ b.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>ဆိုင်ခွဲ</th>
-          <th>ရက်စွဲနှင့်အချိန်</th>
-          <th>ကုတ်</th>
-          <th>ပစ္စည်းအမည်</th>
-          <th>အဝင်အရေအတွက်</th>
-          <th>အဝင်ပြီးလက်ကျန်</th>
-          <th>မှတ်ချက်</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for l in in_logs %}
-        <tr class="in-row" data-branch="{{ l.branch_name }}">
-          <td><span class="branch-pill">{{ l.branch_name }}</span></td>
-          <td style="font-size:13px;">{{ l.log_time }}</td>
-          <td><strong>{{ l.code }}</strong></td>
-          <td>{{ l.name }}</td>
-          <td class="tag-in">+{{ l.qty_change }} ခု</td>
-          <td>{{ l.balance_after }} ခု</td>
-          <td style="font-size:13px; color:#475569;">{{ l.note }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- TAB 5: အပျက်စာရင်း -->
-  <div id="tab-damage" class="tab-content">
-    <div class="form-row">
-      <label><strong>ဆိုင်ခွဲ ရွေးရန်:</strong></label>
-      <select id="damage-branch-filter" onchange="filterSimpleTable('damage')">
-        <option value="ALL">ဆိုင်ခွဲအားလုံး</option>
-        {% for b in branches %}
-        <option value="{{ b.name }}">{{ b.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>ဆိုင်ခွဲ</th>
-          <th>ရက်စွဲနှင့်အချိန်</th>
-          <th>ကုတ်</th>
-          <th>ပစ္စည်းအမည်</th>
-          <th>အပျက်အရေအတွက်</th>
-          <th>နှုတ်ပြီးလက်ကျန်</th>
-          <th>အကြောင်းရင်း/မှတ်ချက်</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for l in dmg_logs %}
-        <tr class="damage-row" data-branch="{{ l.branch_name }}">
-          <td><span class="branch-pill">{{ l.branch_name }}</span></td>
-          <td style="font-size:13px;">{{ l.log_time }}</td>
-          <td><strong>{{ l.code }}</strong></td>
-          <td>{{ l.name }}</td>
-          <td class="tag-dmg">{{ l.qty_change }} ခု</td>
-          <td>{{ l.balance_after }} ခု</td>
-          <td style="font-size:13px; color:#475569;">{{ l.note }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  <!-- TAB 6: ဆိုင်ခွဲများ ထပ်တိုး/စီမံရန် -->
-  <div id="tab-branches" class="tab-content">
-    <h3>ဆိုင်ခွဲ အသစ်ထပ်တိုးရန် (ဥပမာ - ဆိုင်ခွဲ 6, ဆိုင်ခွဲ 7)</h3>
-    <div class="form-row">
-      <input type="text" id="b-name" placeholder="ဆိုင်ခွဲအမည် (ဥပမာ - ဆိုင်ခွဲ 6)" style="flex:2;">
-      <input type="text" id="b-code" placeholder="URL ကုတ် (မထည့်လည်း Auto - ဥပမာ shop6)" style="flex:1;">
-      <button class="btn-add" onclick="addBranch()">+ ဆိုင်ခွဲ အသစ်တိုးမယ်</button>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th>ဆိုင်ခွဲအမည်</th>
-          <th>POS အရောင်းကောင်တာ လင့်ခ်</th>
-          <th>ဖုန်း Scanner လင့်ခ်</th>
-          <th>ဖျက်ရန်</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for b in branches %}
-        <tr>
-          <td><strong>{{ b.name }}</strong></td>
-          <td><a href="/pos/{{ b.code }}" target="_blank">{{ base_url }}/pos/{{ b.code }}</a></td>
-          <td><a href="/scanner/{{ b.code }}" target="_blank">{{ base_url }}/scanner/{{ b.code }}</a></td>
-          <td><button class="btn-del" data-id="{{ b.id }}" data-name="{{ b.name }}" onclick="deleteBranch(this)">ဖျက်</button></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<div class="tabs">
+  <button class="tab-btn active" onclick="openTab('branchTab', this)">🏪 ဆိုင်ခွဲနှင့် Password များ</button>
+  <button class="tab-btn" onclick="openTab('productTab', this)">🏷️ ပစ္စည်းနှင့် Master ဈေးနှုန်း</button>
+  <button class="tab-btn" onclick="openTab('stockTab', this)">📦 ဆိုင်ခွဲအလိုက် Stock အဝင်/အပျက်</button>
+  <button class="tab-btn" onclick="openTab('salesTab', this)">💰 အရောင်းစာရင်းအားလုံး</button>
+  <button class="tab-btn" onclick="openTab('logsTab', this)">📋 အဝင် / အပျက် မှတ်တမ်း</button>
 </div>
 
-<div id="sticker-sheet"></div>
+<!-- ၁။ ဆိုင်ခွဲနှင့် Password စီမံခန့်ခွဲမှု -->
+<div id="branchTab" class="card active">
+  <h3>➕ ဆိုင်ခွဲအသစ် ထပ်တိုးရန်</h3>
+  <div class="form-row">
+    <input type="text" id="newBranchName" placeholder="ဆိုင်ခွဲအမည် (ဥပမာ ဆိုင်ခွဲ 6)">
+    <input type="text" id="newBranchCode" placeholder="URL ကုတ် (မထည့်လည်းရ - shop6)">
+    <input type="text" id="newBranchPw" placeholder="ဆိုင်ခွဲ Password (ဥပမာ 6666)">
+    <button class="btn-blue" onclick="addBranch()">ဆိုင်ခွဲထည့်မည်</button>
+  </div>
+
+  <h3>🔐 ဆိုင်ခွဲစာရင်းနှင့် Password ပြင်ဆင်ရန်</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>ဆိုင်ခွဲအမည်</th>
+        <th>ကုတ်</th>
+        <th>POS လင့်ခ်</th>
+        <th>ဆိုင်ခွဲ Password</th>
+        <th>လုပ်ဆောင်ချက်</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in branches %}
+      <tr>
+        <td><strong>{{ b.name }}</strong></td>
+        <td><code>{{ b.code }}</code></td>
+        <td><a href="{{ base_url }}/pos/{{ b.code }}" target="_blank">{{ base_url }}/pos/{{ b.code }}</a></td>
+        <td>
+          <input type="text" id="pw_{{ b.id }}" class="pw-input" value="{{ b.password }}">
+          <button class="btn-green btn-sm" onclick="updateBranchPw({{ b.id }}, '{{ b.name }}')">PW ပြောင်းမည်</button>
+        </td>
+        <td>
+          <button class="btn-red" onclick="deleteBranch({{ b.id }}, '{{ b.name }}')">ဖျက်မည်</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ၂။ ပစ္စည်းနှင့် Master ဈေးနှုန်း -->
+<div id="productTab" class="card">
+  <h3>➕ ပစ္စည်းအသစ် ထည့်သွင်းရန်</h3>
+  <div class="form-row">
+    <input type="text" id="prodCode" placeholder="ကုတ် (အလွတ်ထားပါက P0001 ထွက်မည်)">
+    <input type="text" id="prodName" placeholder="ပစ္စည်းအမည်">
+    <input type="number" id="prodPrice" placeholder="ရောင်းဈေး (ကျပ်)">
+    <input type="number" id="prodStock" placeholder="ဆိုင်ခွဲတိုင်း စတင်လက်ကျန်" value="0">
+    <button class="btn-blue" onclick="addProduct()">ပစ္စည်းထည့်မည်</button>
+  </div>
+
+  <h3>🏷️ ပစ္စည်းစာရင်း၊ Master ဈေးနှုန်းနှင့် QR Sticker</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>QR</th>
+        <th>ကုတ်</th>
+        <th>ပစ္စည်းအမည်</th>
+        <th>Master ဈေးနှုန်း (ကျပ်)</th>
+        <th>ဆိုင်ခွဲအားလုံး စုစုပေါင်းလက်ကျန်</th>
+        <th>Sticker / ဖျက်ရန်</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in products %}
+      <tr>
+        <td><img src="{{ p.qr }}" class="qr-img" alt="{{ p.code }}"></td>
+        <td><strong>{{ p.code }}</strong></td>
+        <td>{{ p.name }}</td>
+        <td>
+          <input type="number" id="price_{{ p.id }}" value="{{ p.price }}" style="width:110px; padding:6px;">
+          <button class="btn-amber btn-sm" onclick="updatePrice({{ p.id }})">ဈေးပြင်မည်</button>
+        </td>
+        <td><strong>{{ p.total_stock }}</strong></td>
+        <td>
+          <button class="btn-blue btn-sm" onclick="printSticker('{{ p.code }}', '{{ p.name }}', {{ p.price }}, '{{ p.qr }}')">Sticker ထုတ်</button>
+          <button class="btn-red" onclick="deleteProduct({{ p.id }}, '{{ p.name }}')">ဖျက်</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ၃။ ဆိုင်ခွဲအလိုက် Stock အဝင် / အပျက် -->
+<div id="stockTab" class="card">
+  <h3>📦 ဆိုင်ခွဲအလိုက် Stock အဝင်ထည့်ခြင်း / အပျက်အစီးနှုတ်ခြင်း</h3>
+  <div class="form-row">
+    <select id="adjBranch">
+      {% for b in branches %}
+      <option value="{{ b.id }}">{{ b.name }}</option>
+      {% endfor %}
+    </select>
+    <select id="adjProduct">
+      {% for p in products %}
+      <option value="{{ p.id }}">{{ p.code }} - {{ p.name }}</option>
+      {% endfor %}
+    </select>
+    <select id="adjAction">
+      <option value="in">📥 ပစ္စည်းအဝင် (+)</option>
+      <option value="damage">⚠️ အပျက်အစီးနှုတ် (-)</option>
+    </select>
+    <input type="number" id="adjQty" placeholder="အရေအတွက်" style="width:120px;">
+    <input type="text" id="adjNote" placeholder="မှတ်ချက် (ဥပမာ ဂိုဒေါင်မှရောက်)">
+    <button class="btn-green" onclick="adjustStock()">အတည်ပြုမည်</button>
+  </div>
+
+  <h3>📊 ဆိုင်ခွဲတစ်ခုချင်းစီ၏ လက်ကျန်စာရင်း</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>ဆိုင်ခွဲ</th>
+        <th>ကုတ်</th>
+        <th>ပစ္စည်းအမည်</th>
+        <th>ဈေးနှုန်း</th>
+        <th>လက်ကျန်</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sr in stock_rows %}
+      <tr>
+        <td><strong>{{ sr.branch_name }}</strong></td>
+        <td>{{ sr.code }}</td>
+        <td>{{ sr.name }}</td>
+        <td>{{ "{:,}".format(sr.price) }}</td>
+        <td>{% if sr.stock <= 5 %}<span class="badge-low">{{ sr.stock }}</span>{% else %}{{ sr.stock }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ၄။ အရောင်းစာရင်းအားလုံး -->
+<div id="salesTab" class="card">
+  <h3>💰 ဆိုင်ခွဲအားလုံး၏ နောက်ဆုံးအရောင်းစာရင်း (၃၀၀)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>ဆိုင်ခွဲ</th>
+        <th>အချိန်</th>
+        <th>ဘောင်ချာ</th>
+        <th>ကုတ်</th>
+        <th>ပစ္စည်းအမည်</th>
+        <th>ခု</th>
+        <th>ဈေးနှုန်း</th>
+        <th>သင့်ငွေ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sales %}
+      <tr>
+        <td><strong>{{ s.branch_name }}</strong></td>
+        <td>{{ s.sale_time }}</td>
+        <td>{{ s.receipt_no }}</td>
+        <td>{{ s.code }}</td>
+        <td>{{ s.name }}</td>
+        <td>{{ s.qty }}</td>
+        <td>{{ "{:,}".format(s.price) }}</td>
+        <td>{{ "{:,}".format(s.subtotal) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ၅။ အဝင် / အပျက် မှတ်တမ်း -->
+<div id="logsTab" class="card">
+  <h3>📥 ပစ္စည်းအဝင် မှတ်တမ်းများ</h3>
+  <table>
+    <thead><tr><th>ဆိုင်ခွဲ</th><th>အချိန်</th><th>ကုတ်</th><th>ပစ္စည်းအမည်</th><th>အဝင်</th><th>လက်ကျန်</th><th>မှတ်ချက်</th></tr></thead>
+    <tbody>
+      {% for l in in_logs %}
+      <tr>
+        <td><strong>{{ l.branch_name }}</strong></td>
+        <td>{{ l.log_time }}</td>
+        <td>{{ l.code }}</td>
+        <td>{{ l.name }}</td>
+        <td style="color:#16a34a; font-weight:bold;">+{{ l.qty_change }}</td>
+        <td>{{ l.balance_after }}</td>
+        <td>{{ l.note }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3 style="margin-top:25px;">⚠️ အပျက်အစီး မှတ်တမ်းများ</h3>
+  <table>
+    <thead><tr><th>ဆိုင်ခွဲ</th><th>အချိန်</th><th>ကုတ်</th><th>ပစ္စည်းအမည်</th><th>အပျက်</th><th>လက်ကျန်</th><th>မှတ်ချက်</th></tr></thead>
+    <tbody>
+      {% for d in dmg_logs %}
+      <tr>
+        <td><strong>{{ d.branch_name }}</strong></td>
+        <td>{{ d.log_time }}</td>
+        <td>{{ d.code }}</td>
+        <td>{{ d.name }}</td>
+        <td style="color:#dc2626; font-weight:bold;">{{ d.qty_change }}</td>
+        <td>{{ d.balance_after }}</td>
+        <td>{{ d.note }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
 <script>
-let lowOnly = false;
-
-function switchTab(tabName) {
-  document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
-  document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
-  const target = document.getElementById("tab-" + tabName);
-  const btn = document.getElementById("btn-tab-" + tabName);
-  if (target && btn) {
-    target.classList.add("active");
-    btn.classList.add("active");
-    sessionStorage.setItem("activeAdminTab", tabName);
+  function openTab(tabId, btn) {
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    btn.classList.add('active');
   }
-}
 
-window.addEventListener("DOMContentLoaded", () => {
-  const savedTab = sessionStorage.getItem("activeAdminTab");
-  if (savedTab) switchTab(savedTab);
-  filterStockTable();
-  filterSimpleTable("sales");
-});
+  function addBranch() {
+    const name = document.getElementById("newBranchName").value.trim();
+    const code = document.getElementById("newBranchCode").value.trim();
+    const password = document.getElementById("newBranchPw").value.trim();
+    if (!name) return alert("ဆိုင်ခွဲအမည် ထည့်ပါ");
 
-function toggleLowOnly() {
-  lowOnly = !lowOnly;
-  document.getElementById("btn-low-only").classList.toggle("active", lowOnly);
-  filterStockTable();
-}
-
-function filterStockTable() {
-  const branchId = document.getElementById("stock-branch-filter").value;
-  const q = document.getElementById("stock-search").value.trim().toLowerCase();
-
-  let totalQty = 0;
-  let lowCount = 0;
-  let totalVal = 0;
-
-  document.querySelectorAll(".stock-row").forEach(row => {
-    const rowBranch = row.dataset.branchId;
-    const name = row.dataset.name;
-    const code = row.dataset.code;
-    const stock = parseInt(row.dataset.stock) || 0;
-    const val = parseInt(row.dataset.val) || 0;
-
-    const matchBranch = (branchId === "ALL") || (rowBranch === branchId);
-    const matchText = name.includes(q) || code.includes(q);
-    const matchLow = !lowOnly || stock <= 5;
-
-    if (matchBranch && matchText && matchLow) {
-      row.style.display = "";
-      totalQty += stock;
-      totalVal += val;
-      if (stock <= 5) lowCount++;
-    } else {
-      row.style.display = "none";
-    }
-  });
-
-  document.getElementById("sum-stock-qty").innerText = totalQty.toLocaleString() + " ခု";
-  document.getElementById("low-stock-count").innerText = lowCount + " ခု";
-  document.getElementById("total-stock-val").innerText = totalVal.toLocaleString() + " Ks";
-}
-
-function filterSimpleTable(type) {
-  const branchName = document.getElementById(type + "-branch-filter").value;
-  let salesTotal = 0;
-
-  document.querySelectorAll("." + type + "-row").forEach(row => {
-    const match = (branchName === "ALL") || (row.dataset.branch === branchName);
-    row.style.display = match ? "" : "none";
-    if (match && type === "sales") {
-      salesTotal += parseInt(row.dataset.subtotal) || 0;
-    }
-  });
-
-  if (type === "sales") {
-    document.getElementById("filtered-sales-total").innerText = salesTotal.toLocaleString() + " Ks";
+    fetch("/api/branches", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, code, password })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.status === "ok") location.reload();
+      else alert(res.message);
+    });
   }
-}
 
-async function addBranch() {
-  const name = document.getElementById("b-name").value.trim();
-  const code = document.getElementById("b-code").value.trim();
-  if (!name) return alert("ဆိုင်ခွဲအမည် ထည့်ပါ");
+  function updateBranchPw(bid, bname) {
+    const password = document.getElementById("pw_" + bid).value.trim();
+    if (!password) return alert("Password အသစ် ထည့်ပါ");
 
-  const res = await fetch("/api/branches", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, code })
-  });
-  const data = await res.json();
-  if (data.status === "ok") location.reload();
-  else alert(data.message);
-}
+    fetch(`/api/branches/${bid}/password`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.status === "ok") alert(`${bname} ၏ Password ကို "${password}" သို့ ပြောင်းလဲပြီးပါပြီ`);
+      else alert(res.message);
+    });
+  }
 
-async function deleteBranch(btn) {
-  const id = btn.dataset.id;
-  const name = btn.dataset.name;
-  if (!confirm(`[${name}] ကို ဖျက်မှာသေချာလား?`)) return;
-  const res = await fetch("/api/branches/" + id, { method: "DELETE" });
-  const data = await res.json();
-  if (data.status === "ok") location.reload();
-  else alert(data.message);
-}
+  function deleteBranch(bid, bname) {
+    if (!confirm(`${bname} ကို ဖျက်မှာ သေချာပါသလား?`)) return;
+    fetch(`/api/branches/${bid}`, { method: "DELETE" })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === "ok") location.reload();
+        else alert(res.message);
+      });
+  }
 
-async function addProduct() {
-  const name = document.getElementById("p-name").value.trim();
-  const price = document.getElementById("p-price").value;
-  const stock = document.getElementById("p-stock").value || 0;
-  const code = document.getElementById("p-code").value.trim();
-  if (!name || !price) return alert("ပစ္စည်းအမည်နှင့် ဈေးနှုန်းထည့်ပါ");
+  function addProduct() {
+    const code = document.getElementById("prodCode").value.trim();
+    const name = document.getElementById("prodName").value.trim();
+    const price = document.getElementById("prodPrice").value;
+    const stock = document.getElementById("prodStock").value;
 
-  const res = await fetch("/api/products", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, price, stock, code })
-  });
-  const data = await res.json();
-  if (data.status === "ok") location.reload();
-  else alert(data.message);
-}
+    fetch("/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, name, price, stock })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.status === "ok") location.reload();
+      else alert(res.message);
+    });
+  }
 
-async function editPrice(btn) {
-  const id = btn.dataset.id;
-  const name = btn.dataset.name;
-  const currentPrice = btn.dataset.price;
-  const priceStr = prompt(`[${name}] ဈေးနှုန်းအသစ် ထည့်ပါ (ဆိုင်ခွဲအားလုံး ပြောင်းလဲပါမည်):`, currentPrice);
-  if (priceStr === null) return;
-  const newPrice = parseInt(priceStr);
-  if (!newPrice || newPrice <= 0) return alert("ဈေးနှုန်း မှန်ကန်စွာထည့်ပါ");
+  function updatePrice(pid) {
+    const price = document.getElementById("price_" + pid).value;
+    fetch(`/api/products/${pid}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ price })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.status === "ok") alert("Master ဈေးနှုန်း ပြင်ဆင်ပြီးပါပြီ");
+      else alert(res.message);
+    });
+  }
 
-  const res = await fetch("/api/products/" + id, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ price: newPrice })
-  });
-  const data = await res.json();
-  if (data.status === "ok") location.reload();
-  else alert(data.message);
-}
+  function deleteProduct(pid, pname) {
+    if (!confirm(`${pname} ကို ဖျက်မှာ သေချာပါသလား?`)) return;
+    fetch(`/api/products/${pid}`, { method: "DELETE" })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === "ok") location.reload();
+        else alert(res.message);
+      });
+  }
 
-async function adjustStock(btn, action) {
-  const branchId = btn.dataset.branchId;
-  const branchName = btn.dataset.branchName;
-  const productId = btn.dataset.productId;
-  const name = btn.dataset.name;
+  function adjustStock() {
+    const branch_id = document.getElementById("adjBranch").value;
+    const product_id = document.getElementById("adjProduct").value;
+    const action = document.getElementById("adjAction").value;
+    const qty = document.getElementById("adjQty").value;
+    const note = document.getElementById("adjNote").value.trim();
 
-  const title = action === "in"
-    ? `[${branchName}] - [${name}] ပစ္စည်းအဝင် အရေအတွက် ထည့်ပါ:`
-    : `[${branchName}] - [${name}] အပျက်အစီး နှုတ်မည့် အရေအတွက် ထည့်ပါ:`;
-  const qtyStr = prompt(title, "1");
-  if (qtyStr === null) return;
-  const qty = parseInt(qtyStr);
-  if (!qty || qty <= 0) return alert("အရေအတွက် မှန်ကန်စွာထည့်ပါ");
+    fetch("/api/stock/adjust", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ branch_id, product_id, action, qty, note })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.status === "ok") location.reload();
+      else alert(res.message);
+    });
+  }
 
-  const notePrompt = action === "in" ? "မှတ်ချက် (မထည့်လည်းရ):" : "အပျက်အစီး အကြောင်းရင်း:";
-  const note = prompt(notePrompt, "") || "";
-
-  const res = await fetch("/api/stock/adjust", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ branch_id: branchId, product_id: productId, action, qty, note })
-  });
-  const data = await res.json();
-  if (data.status === "ok") location.reload();
-  else alert(data.message);
-}
-
-async function deleteProduct(btn) {
-  const id = btn.dataset.id;
-  if (!confirm("ဒီပစ္စည်းကို ဆိုင်ခွဲအားလုံးမှ ဖျက်မှာသေချာလား?")) return;
-  await fetch("/api/products/" + id, { method: "DELETE" });
-  location.reload();
-}
-
-function printStickers() {
-  const sheet = document.getElementById("sticker-sheet");
-  const includePrice = document.getElementById("include-price").checked;
-  sheet.innerHTML = "";
-  let totalStickers = 0;
-
-  document.querySelectorAll(".print-qty").forEach(input => {
-    const qty = parseInt(input.value) || 0;
-    const priceHtml = includePrice ? `<div class="st-price">${parseInt(input.dataset.price).toLocaleString()} Ks</div>` : "";
-    for (let i = 0; i < qty; i++) {
-      totalStickers++;
-      sheet.innerHTML += `
-        <div class="sticker-card">
-          <img src="${input.dataset.qr}">
-          <div class="st-name">${input.dataset.name}</div>
-          ${priceHtml}
-          <div class="st-code">${input.dataset.code}</div>
-        </div>`;
-    }
-  });
-
-  if (totalStickers === 0) return alert("Print ထုတ်လိုသော Sticker အရေအတွက် အရင်ထည့်ပါ");
-  window.print();
-}
+  function printSticker(code, name, price, qrSrc) {
+    const win = window.open("", "_blank", "width=300,height=320");
+    win.document.write(`
+      <html><head><title>${code}</title>
+      <style>
+        body { font-family: sans-serif; text-align: center; margin: 10px; }
+        img { width: 130px; height: 130px; }
+        .name { font-weight: bold; font-size: 14px; margin-top: 4px; }
+        .price { font-size: 15px; font-weight: bold; margin-top: 2px; }
+      </style></head>
+      <body onload="window.print(); setTimeout(() => window.close(), 400);">
+        <img src="${qrSrc}">
+        <div class="name">${name} (${code})</div>
+        <div class="price">${Number(price).toLocaleString()} ကျပ်</div>
+      </body></html>
+    `);
+    win.document.close();
+  }
 </script>
 </body>
 </html>
