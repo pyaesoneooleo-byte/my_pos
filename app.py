@@ -33,7 +33,6 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
 
-    # ၁။ ဆိုင်ခွဲများ ဇယား (ဆိုင်ခွဲတစ်ခုချင်းစီအတွက် Password ပါဝင်သည်)
     c.execute('''CREATE TABLE IF NOT EXISTS branches (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     code TEXT UNIQUE NOT NULL,
@@ -52,7 +51,6 @@ def init_db():
                 (f"shop{i}", f"ဆိုင်ခွဲ {i}", f"{i}{i}{i}{i}")
             )
 
-    # ၂။ ပစ္စည်းနှင့် ဈေးနှုန်း ဇယား (Master Price)
     c.execute('''CREATE TABLE IF NOT EXISTS products (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     code TEXT UNIQUE NOT NULL,
@@ -61,7 +59,6 @@ def init_db():
                     stock INTEGER NOT NULL DEFAULT 0
                 )''')
 
-    # ၃။ ဆိုင်ခွဲအလိုက် လက်ကျန် (Stock) ဇယား
     c.execute('''CREATE TABLE IF NOT EXISTS branch_stocks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     branch_id INTEGER NOT NULL,
@@ -70,7 +67,6 @@ def init_db():
                     UNIQUE(branch_id, product_id)
                 )''')
 
-    # ၄။ အရောင်းစာရင်း ဇယား
     c.execute('''CREATE TABLE IF NOT EXISTS sales (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     branch_name TEXT NOT NULL DEFAULT 'ဆိုင်ခွဲ 1',
@@ -83,7 +79,6 @@ def init_db():
                     subtotal INTEGER NOT NULL
                 )''')
 
-    # ၅။ Stock အဝင်/အရောင်း/အပျက် မှတ်တမ်း ဇယား
     c.execute('''CREATE TABLE IF NOT EXISTS stock_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     branch_name TEXT NOT NULL DEFAULT 'ဆိုင်ခွဲ 1',
@@ -121,9 +116,8 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+# ဆိုင်ခွဲတစ်ခုချင်းစီ၏ Session ကိုသာ သီးသန့်စစ်ဆေးမည် (Admin ဝင်ထားလည်း ဆိုင်ခွဲ PW တောင်းမည်)
 def has_branch_access(branch_code):
-    if session.get("is_admin"):
-        return True
     allowed = session.get("allowed_branches", [])
     return branch_code in allowed
 
@@ -153,7 +147,6 @@ def append_to_excel(rows):
     except Exception as e:
         return False, str(e)
 
-# --- ပင်မစာမျက်နှာ (ဆိုင်ခွဲ ရွေးချယ်ရန်) ---
 @app.route("/")
 def index_page():
     conn = get_db()
@@ -187,19 +180,18 @@ def index_page():
     </div></body></html>
     '''
 
-# --- ဆိုင်ခွဲ Login / Logout ---
 @app.route("/pos/<branch_code>/login", methods=["GET", "POST"])
 def branch_login(branch_code):
     conn = get_db()
     branch = conn.execute("SELECT * FROM branches WHERE code = ?", (branch_code,)).fetchone()
     conn.close()
     if not branch:
-        return redirect(url_for("index_page"))
+        return "ဆိုင်ခွဲ မတွေ့ပါ", 404
 
     error = ""
     if request.method == "POST":
         pw = request.form.get("password", "").strip()
-        if pw == branch["password"] or pw == ADMIN_PASSWORD:
+        if pw == branch["password"]:
             allowed = session.get("allowed_branches", [])
             if branch_code not in allowed:
                 allowed.append(branch_code)
@@ -225,7 +217,6 @@ def branch_login(branch_code):
         <input type="password" name="password" placeholder="ဆိုင်ခွဲ Password ထည့်ပါ" required autofocus>
         <button type="submit">ကောင်တာ ဖွင့်မည်</button>
       </form>
-      <p style="margin-top:15px;"><a href="/" style="color:#94a3b8; font-size:13px;">← ဆိုင်ခွဲရွေးချယ်ရန် စာမျက်နှာသို့</a></p>
     </div></body></html>
     '''
 
@@ -237,7 +228,6 @@ def branch_logout(branch_code):
     session["allowed_branches"] = allowed
     return redirect(url_for("branch_login", branch_code=branch_code))
 
-# --- ဆိုင်ခွဲအလိုက် POS ကောင်တာ (Password စစ်ဆေးပြီးမှ ဝင်ခွင့်ပြုမည်) ---
 @app.route("/pos/<branch_code>")
 def pos_page(branch_code):
     if not has_branch_access(branch_code):
@@ -247,7 +237,7 @@ def pos_page(branch_code):
     branch = conn.execute("SELECT * FROM branches WHERE code = ?", (branch_code,)).fetchone()
     if not branch:
         conn.close()
-        return redirect(url_for("index_page"))
+        return "ဆိုင်ခွဲ မတွေ့ပါ", 404
 
     products = conn.execute('''
         SELECT p.id, p.code, p.name, p.price, COALESCE(bs.stock, 0) AS stock
@@ -270,7 +260,6 @@ def pos_page(branch_code):
         scanner_qr=scanner_qr
     )
 
-# --- ဆိုင်ခွဲအလိုက် သီးသန့် စာရင်း (၄) မျိုး ကြည့်ရှုရန် စာမျက်နှာ ---
 @app.route("/pos/<branch_code>/reports")
 def branch_reports(branch_code):
     if not has_branch_access(branch_code):
@@ -280,9 +269,8 @@ def branch_reports(branch_code):
     branch = conn.execute("SELECT * FROM branches WHERE code = ?", (branch_code,)).fetchone()
     if not branch:
         conn.close()
-        return redirect(url_for("index_page"))
+        return "ဆိုင်ခွဲ မတွေ့ပါ", 404
 
-    # ၁။ ဤဆိုင်ခွဲ၏ လက်ကျန်စာရင်း
     stocks = conn.execute('''
         SELECT p.code, p.name, p.price, COALESCE(bs.stock, 0) AS stock, (p.price * COALESCE(bs.stock, 0)) AS total_val
         FROM products p
@@ -290,7 +278,6 @@ def branch_reports(branch_code):
         ORDER BY p.id DESC
     ''', (branch["id"],)).fetchall()
 
-    # ၂။ ဤဆိုင်ခွဲ၏ အရောင်းစာရင်း
     sales = conn.execute(
         "SELECT * FROM sales WHERE branch_name = ? ORDER BY id DESC LIMIT 300",
         (branch["name"],)
@@ -300,13 +287,11 @@ def branch_reports(branch_code):
         (branch["name"],)
     ).fetchone()[0]
 
-    # ၃။ ဤဆိုင်ခွဲ၏ ပစ္စည်းအဝင်စာရင်း
     in_logs = conn.execute(
         "SELECT * FROM stock_logs WHERE branch_name = ? AND change_type = 'ပစ္စည်းအဝင်' ORDER BY id DESC LIMIT 300",
         (branch["name"],)
     ).fetchall()
 
-    # ၄။ ဤဆိုင်ခွဲ၏ အပျက်အစီးစာရင်း
     dmg_logs = conn.execute(
         "SELECT * FROM stock_logs WHERE branch_name = ? AND change_type = 'အပျက်အစီးနှုတ်' ORDER BY id DESC LIMIT 300",
         (branch["name"],)
@@ -332,7 +317,6 @@ def scanner_page(branch_code):
         return "ဆိုင်ခွဲ မတွေ့ပါ", 404
     return render_template("scanner.html", branch=branch)
 
-# --- Admin Login / Logout ---
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     error = ""
@@ -368,7 +352,6 @@ def admin_logout():
     session.pop("is_admin", None)
     return redirect(url_for("index_page"))
 
-# --- Admin Dashboard ---
 @app.route("/admin")
 @admin_required
 def admin_page():
@@ -416,7 +399,6 @@ def admin_page():
         base_url=base_url
     )
 
-# --- API: ဆိုင်ခွဲ အသစ်ထည့်ခြင်း၊ Password ပြင်ခြင်း၊ ဖျက်ခြင်း ---
 @app.route("/api/branches", methods=["POST"])
 @admin_required
 def add_branch():
@@ -473,7 +455,6 @@ def delete_branch(bid):
     conn.close()
     return jsonify({"status": "ok"})
 
-# --- API: ပစ္စည်းအသစ်ထည့်ခြင်း၊ ဈေးပြင်ခြင်း၊ ဖျက်ခြင်း ---
 @app.route("/api/products", methods=["POST"])
 @admin_required
 def add_product():
@@ -534,7 +515,6 @@ def delete_product(pid):
     conn.close()
     return jsonify({"status": "ok"})
 
-# --- API: ဆိုင်ခွဲအလိုက် Stock အဝင် / အပျက်အစီး နှုတ်ခြင်း ---
 @app.route("/api/stock/adjust", methods=["POST"])
 @admin_required
 def adjust_stock():
@@ -584,7 +564,6 @@ def adjust_stock():
     conn.close()
     return jsonify({"status": "ok", "new_stock": new_stock})
 
-# --- API: Scan နှင့် Real-time Stream ---
 @app.route("/api/scan", methods=["POST"])
 def handle_scan():
     data = request.json
@@ -629,7 +608,6 @@ def stream(branch_code):
     resp.headers["X-Accel-Buffering"] = "no"
     return resp
 
-# --- API: ငွေရှင်းခြင်း ---
 @app.route("/api/checkout", methods=["POST"])
 def checkout():
     data = request.json
