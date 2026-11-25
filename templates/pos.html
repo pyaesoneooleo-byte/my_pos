@@ -6,23 +6,29 @@
   <title>{{ branch.name }} - POS ကောင်တာ</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    body { font-family: 'Segoe UI', Pyidaungsu, sans-serif; background: #f1f5f9; margin: 0; padding: 15px; }
+    body { font-family: 'Segoe UI', Pyidaungsu, sans-serif; background: #f1f5f9; margin: 0; padding: 15px; color: #0f172a; }
     .topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: #0f172a; color: #fff; padding: 12px 20px; border-radius: 10px; margin-bottom: 15px; }
     .nav-links a { color: #fff; text-decoration: none; padding: 7px 14px; border-radius: 6px; font-size: 14px; font-weight: bold; margin-left: 6px; }
     .container { display: grid; grid-template-columns: 2fr 1fr; gap: 15px; }
     @media (max-width: 850px) { .container { grid-template-columns: 1fr; } }
     .card { background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); margin-bottom: 15px; }
     .input-row { display: flex; gap: 10px; margin-bottom: 15px; }
-    input[type="text"] { flex: 1; padding: 12px; font-size: 16px; border: 2px solid #cbd5e1; border-radius: 8px; }
+    input[type="text"], input[type="number"] { padding: 12px; font-size: 16px; border: 2px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; }
+    .input-row input[type="text"] { flex: 1; }
     button { padding: 12px 18px; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
     .btn-blue { background: #2563eb; color: #fff; }
-    .btn-green { background: #16a34a; color: #fff; width: 100%; font-size: 18px; padding: 14px; margin-top: 10px; }
+    .btn-green { background: #16a34a; color: #fff; width: 100%; font-size: 18px; padding: 14px; margin-top: 12px; }
+    .btn-gray { background: #e2e8f0; color: #334155; width: 100%; font-size: 15px; padding: 11px; margin-top: 8px; }
     .btn-red { background: #dc2626; color: #fff; padding: 5px 10px; font-size: 13px; }
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
     th { background: #f8fafc; }
-    .total-box { font-size: 24px; font-weight: bold; color: #0f172a; text-align: right; margin-top: 15px; }
-    .qr-box { text-align: center; margin-top: 15px; padding-top: 15px; border-top: 1px dashed #cbd5e1; }
+    .pay-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .total-label { font-size: 22px; font-weight: bold; color: #0f766e; }
+    .total-val { font-size: 24px; font-weight: bold; color: #0f766e; }
+    .change-label { font-size: 20px; font-weight: bold; color: #0f172a; }
+    .change-val { font-size: 22px; font-weight: bold; color: #dc2626; }
+    .qr-box { text-align: center; margin-top: 16px; padding-top: 14px; border: 1px dashed #cbd5e1; border-radius: 10px; padding-bottom: 12px; }
     .stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
     .prod-btn {
       background: #f8fafc; border: 2px solid #cbd5e1; border-radius: 10px; padding: 12px 10px;
@@ -48,6 +54,7 @@
 </div>
 
 <div class="container">
+  <!-- ဘယ်ဘက်ခြမ်း: ကုတ်ရိုက်ထည့်ရန် + ဈေးဝယ်စာရင်း + Stock ရှိပစ္စည်းများ -->
   <div>
     <div class="card">
       <div class="input-row">
@@ -68,28 +75,47 @@
         </thead>
         <tbody id="cartBody"></tbody>
       </table>
-
-      <div class="total-box">စုစုပေါင်း: <span id="grandTotal">0</span> ကျပ်</div>
-      <button class="btn-green" onclick="checkout()">ငွေရှင်းပြီး ဘောင်ချာထုတ်မည် (Print)</button>
     </div>
 
-    <!-- Stock ရှိ ပစ္စည်းများ Click နှိပ်ရွေးချယ်ရန် -->
     <div class="card">
       <h4 style="margin:0 0 8px 0;">📦 {{ branch.name }} တွင် လက်ကျန်ရှိ ပစ္စည်းများ (Barcode မဖတ်ပါက နှိပ်၍ရွေးပါ)</h4>
       <div id="stockGrid" class="stock-grid"></div>
     </div>
   </div>
 
-  <div class="card">
-    <h4 style="margin-top:0;">📷 PC Webcam Scanner</h4>
-    <div id="reader" style="width:100%;"></div>
-
-    <div class="qr-box">
-      <h4 style="margin:5px 0;">📱 ဖုန်းဖြင့် Scan ဖတ်ရန်</h4>
-      <img src="{{ scanner_qr }}" alt="Scanner QR" style="width:150px; height:150px;">
-      <div style="font-size:12px; color:#475569; word-break:break-all;">
-        <a href="{{ scanner_url }}" target="_blank">{{ scanner_url }}</a>
+  <!-- ညာဘက်ခြမ်း: ငွေရှင်းတွက်ချက်မှု + ဖုန်း QR + PC Webcam -->
+  <div>
+    <div class="card">
+      <div class="pay-row">
+        <span class="total-label">စုစုပေါင်း:</span>
+        <span class="total-val"><span id="grandTotal">0</span> ကျပ်</span>
       </div>
+
+      <div style="margin-bottom: 12px;">
+        <label for="paidInput" style="display:block; font-size:15px; font-weight:bold; margin-bottom:6px;">ပေးငွေ (ကျပ်)</label>
+        <input type="number" id="paidInput" placeholder="0" min="0" style="width:100%; font-size:20px; font-weight:bold;" oninput="calcChange()">
+      </div>
+
+      <div class="pay-row">
+        <span class="change-label">ပြန်အမ်းငွေ:</span>
+        <span class="change-val"><span id="changeAmt">0</span> ကျပ်</span>
+      </div>
+
+      <button class="btn-green" onclick="checkout()">ငွေရှင်းပြီး ဘောင်ချာထုတ်မယ်</button>
+      <button class="btn-gray" onclick="clearCart()">စာရင်းရှင်းမယ်</button>
+
+      <div class="qr-box">
+        <h4 style="margin:5px 0;">📱 ဖုန်း Scanner ချိတ်ရန် QR</h4>
+        <img src="{{ scanner_qr }}" alt="Scanner QR" style="width:145px; height:145px;">
+        <div style="font-size:12px; color:#475569; word-break:break-all; margin-top:4px;">
+          <a href="{{ scanner_url }}" target="_blank">{{ scanner_url }}</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h4 style="margin-top:0;">📷 PC Webcam Scanner</h4>
+      <div id="reader" style="width:100%;"></div>
     </div>
   </div>
 </div>
@@ -99,6 +125,7 @@
   const BRANCH_NAME = "{{ branch.name }}";
   let branchProducts = {{ products | tojson }};
   let cart = [];
+  let currentTotal = 0;
 
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   function playBeep(type = "ok") {
@@ -187,6 +214,19 @@
     renderCart();
   }
 
+  function calcChange() {
+    const paid = parseInt(document.getElementById("paidInput").value || "0", 10);
+    const change = paid - currentTotal;
+    const changeEl = document.getElementById("changeAmt");
+    if (paid > 0 && change < 0) {
+      changeEl.style.color = "#dc2626";
+      changeEl.innerText = change.toLocaleString() + " (လိုငွေ)";
+    } else {
+      changeEl.style.color = "#dc2626";
+      changeEl.innerText = Math.max(0, change).toLocaleString();
+    }
+  }
+
   function renderCart() {
     const tbody = document.getElementById("cartBody");
     tbody.innerHTML = "";
@@ -209,7 +249,16 @@
         </tr>
       `;
     });
+    currentTotal = total;
     document.getElementById("grandTotal").innerText = total.toLocaleString();
+    calcChange();
+  }
+
+  function clearCart() {
+    if (cart.length === 0 && !document.getElementById("paidInput").value) return;
+    cart = [];
+    document.getElementById("paidInput").value = "";
+    renderCart();
   }
 
   const evtSource = new EventSource(`/stream/${BRANCH_CODE}`);
@@ -218,7 +267,7 @@
     addItemToCart(prod);
   };
 
-  function printReceipt(receiptNo, saleTime, items, grandTotal) {
+  function printReceipt(receiptNo, saleTime, items, grandTotal, paidAmt, changeAmt) {
     let rowsHtml = items.map(i => `
       <tr>
         <td style="padding:4px 0;">${i.name}<br><small>${i.code}</small></td>
@@ -227,7 +276,7 @@
       </tr>
     `).join("");
 
-    const win = window.open("", "_blank", "width=380,height=600");
+    const win = window.open("", "_blank", "width=380,height=650");
     win.document.write(`
       <html><head><title>${receiptNo}</title>
       <style>
@@ -236,7 +285,8 @@
         hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
         table { width: 100%; border-collapse: collapse; }
         th { border-bottom: 1px dashed #000; padding-bottom: 4px; font-size: 12px; }
-        .total { font-size: 16px; font-weight: bold; text-align: right; margin-top: 8px; }
+        .sum-row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 14px; }
+        .total { font-size: 16px; font-weight: bold; }
       </style></head>
       <body onload="window.print(); setTimeout(() => window.close(), 500);">
         <h3>${BRANCH_NAME}</h3>
@@ -254,7 +304,9 @@
           <tbody>${rowsHtml}</tbody>
         </table>
         <hr>
-        <div class="total">စုစုပေါင်း: ${grandTotal.toLocaleString()} ကျပ်</div>
+        <div class="sum-row total"><span>စုစုပေါင်း:</span><span>${grandTotal.toLocaleString()} ကျပ်</span></div>
+        <div class="sum-row"><span>ပေးငွေ:</span><span>${paidAmt.toLocaleString()} ကျပ်</span></div>
+        <div class="sum-row"><span>ပြန်အမ်းငွေ:</span><span>${changeAmt.toLocaleString()} ကျပ်</span></div>
         <hr>
         <p>ဝယ်ယူအားပေးမှုကို ကျေးဇူးတင်ပါသည်</p>
       </body></html>
@@ -265,7 +317,16 @@
   function checkout() {
     if (cart.length === 0) return alert("ပစ္စည်းအရင်ထည့်ပါ");
     const soldItems = JSON.parse(JSON.stringify(cart));
-    const totalAmt = soldItems.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    const totalAmt = currentTotal;
+    const rawPaid = parseInt(document.getElementById("paidInput").value || "0", 10);
+
+    if (rawPaid > 0 && rawPaid < totalAmt) {
+      playBeep("err");
+      return alert(`ပေးငွေ (${rawPaid.toLocaleString()} ကျပ်) သည် စုစုပေါင်း (${totalAmt.toLocaleString()} ကျပ်) ထက် နည်းနေပါသည်`);
+    }
+
+    const paidAmt = rawPaid > 0 ? rawPaid : totalAmt;
+    const changeAmt = Math.max(0, paidAmt - totalAmt);
 
     fetch("/api/checkout", {
       method: "POST",
@@ -282,8 +343,9 @@
         });
         renderStockGrid();
         cart = [];
+        document.getElementById("paidInput").value = "";
         renderCart();
-        printReceipt(res.receipt_no, res.sale_time, soldItems, totalAmt);
+        printReceipt(res.receipt_no, res.sale_time, soldItems, totalAmt, paidAmt, changeAmt);
       } else {
         playBeep("err");
         alert(res.message);
