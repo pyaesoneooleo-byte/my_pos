@@ -15,14 +15,12 @@ app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.secret_key = os.environ.get("SECRET_KEY", "pos-multibranch-secret-2026")
 
-# Admin ဝင်ရန် Password (စိတ်ကြိုက်ပြောင်းနိုင်သည်)
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "123456")
 
 DB_PATH = "pos_data.db"
 EXCEL_PATH = "Sales_Report.xlsx"
 PORT = int(os.environ.get("PORT", 8080))
 
-# ဆိုင်ခွဲတစ်ခုချင်းစီအတွက် Real-time SSE Queue များ
 sse_clients = {}
 
 def get_db():
@@ -35,19 +33,26 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
 
-    # ၁။ ဆိုင်ခွဲများ ဇယား
+    # ၁။ ဆိုင်ခွဲများ ဇယား (ဆိုင်ခွဲတစ်ခုချင်းစီအတွက် Password ပါဝင်သည်)
     c.execute('''CREATE TABLE IF NOT EXISTS branches (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     code TEXT UNIQUE NOT NULL,
-                    name TEXT UNIQUE NOT NULL
+                    name TEXT UNIQUE NOT NULL,
+                    password TEXT NOT NULL DEFAULT '1111'
                 )''')
 
-    # ဆိုင်ခွဲ မရှိသေးပါက ဆိုင်ခွဲ 1 မှ 5 အထိ အလိုအလျောက် ထည့်ပေးခြင်း
+    b_cols = [r[1] for r in c.execute("PRAGMA table_info(branches)").fetchall()]
+    if "password" not in b_cols:
+        c.execute("ALTER TABLE branches ADD COLUMN password TEXT NOT NULL DEFAULT '1111'")
+
     if c.execute("SELECT COUNT(*) FROM branches").fetchone()[0] == 0:
         for i in range(1, 6):
-            c.execute("INSERT INTO branches (code, name) VALUES (?, ?)", (f"shop{i}", f"ဆိုင်ခွဲ {i}"))
+            c.execute(
+                "INSERT INTO branches (code, name, password) VALUES (?, ?, ?)",
+                (f"shop{i}", f"ဆိုင်ခွဲ {i}", f"{i}{i}{i}{i}")
+            )
 
-    # ၂။ ပစ္စည်းနှင့် ဈေးနှုန်း ဇယား (ဆိုင်ခွဲအားလုံး တူညီသော Master Price)
+    # ၂။ ပစ္စည်းနှင့် ဈေးနှုန်း ဇယား (Master Price)
     c.execute('''CREATE TABLE IF NOT EXISTS products (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     code TEXT UNIQUE NOT NULL,
@@ -77,9 +82,6 @@ def init_db():
                     price INTEGER NOT NULL,
                     subtotal INTEGER NOT NULL
                 )''')
-    sales_cols = [r[1] for r in c.execute("PRAGMA table_info(sales)").fetchall()]
-    if "branch_name" not in sales_cols:
-        c.execute("ALTER TABLE sales ADD COLUMN branch_name TEXT NOT NULL DEFAULT 'ဆိုင်ခွဲ 1'")
 
     # ၅။ Stock အဝင်/အရောင်း/အပျက် မှတ်တမ်း ဇယား
     c.execute('''CREATE TABLE IF NOT EXISTS stock_logs (
@@ -93,11 +95,7 @@ def init_db():
                     balance_after INTEGER NOT NULL,
                     note TEXT DEFAULT ''
                 )''')
-    log_cols = [r[1] for r in c.execute("PRAGMA table_info(stock_logs)").fetchall()]
-    if "branch_name" not in log_cols:
-        c.execute("ALTER TABLE stock_logs ADD COLUMN branch_name TEXT NOT NULL DEFAULT 'ဆိုင်ခွဲ 1'")
 
-    # ဆိုင်ခွဲတိုင်းနှင့် ပစ္စည်းတိုင်းအတွက် branch_stocks အကွက်များ အပြည့်ရှိနေစေရန် စစ်ဆေးဖြည့်သွင်းခြင်း
     branches = c.execute("SELECT id FROM branches ORDER BY id ASC").fetchall()
     products = c.execute("SELECT id, stock FROM products").fetchall()
     for idx, b in enumerate(branches):
@@ -122,6 +120,12 @@ def admin_required(f):
             return redirect(url_for("admin_login"))
         return f(*args, **kwargs)
     return decorated
+
+def has_branch_access(branch_code):
+    if session.get("is_admin"):
+        return True
+    allowed = session.get("allowed_branches", [])
+    return branch_code in allowed
 
 def make_qr_base64(text):
     qr = qrcode.QRCode(version=1, box_size=6, border=2)
@@ -156,7 +160,7 @@ def index_page():
     branches = conn.execute("SELECT * FROM branches ORDER BY id ASC").fetchall()
     conn.close()
     cards = "".join([
-        f'<a href="/pos/{b["code"]}" class="branch-card">{b["name"]}</a>'
+        f'<a href="/pos/{b["code"]}" class="branch-card">🔒 {b["name"]}</a>'
         for b in branches
     ])
     return f'''
@@ -177,14 +181,68 @@ def index_page():
     </style></head>
     <body><div class="wrap">
       <h2>POS အရောင်းကောင်တာ (ဆိုင်ခွဲ ရွေးချယ်ပါ)</h2>
+      <p style="color:#94a3b8; font-size:14px;">ဆိုင်ခွဲတစ်ခုချင်းစီအတွက် သတ်မှတ်ထားသော Password ဖြင့်သာ ဝင်ရောက်နိုင်ပါသည်</p>
       <div class="grid">{cards}</div>
       <a href="/admin" class="admin-link">Admin စီမံခန့်ခွဲမှု ဝင်ရောက်ရန်</a>
     </div></body></html>
     '''
 
-# --- ဆိုင်ခွဲအလိုက် POS ကောင်တာ နှင့် Wireless Scanner ---
+# --- ဆိုင်ခွဲ Login / Logout ---
+@app.route("/pos/<branch_code>/login", methods=["GET", "POST"])
+def branch_login(branch_code):
+    conn = get_db()
+    branch = conn.execute("SELECT * FROM branches WHERE code = ?", (branch_code,)).fetchone()
+    conn.close()
+    if not branch:
+        return redirect(url_for("index_page"))
+
+    error = ""
+    if request.method == "POST":
+        pw = request.form.get("password", "").strip()
+        if pw == branch["password"] or pw == ADMIN_PASSWORD:
+            allowed = session.get("allowed_branches", [])
+            if branch_code not in allowed:
+                allowed.append(branch_code)
+            session["allowed_branches"] = allowed
+            return redirect(url_for("pos_page", branch_code=branch_code))
+        error = "ဆိုင်ခွဲ Password မှားယွင်းနေပါသည်"
+
+    return f'''
+    <!DOCTYPE html>
+    <html lang="my"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{branch["name"]} - Login</title>
+    <style>
+      body {{ font-family: 'Segoe UI', Pyidaungsu, sans-serif; background: #0f172a; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }}
+      .box {{ background: #1e293b; padding: 30px; border-radius: 12px; width: 330px; text-align: center; border: 1px solid #334155; }}
+      input {{ width: 100%; padding: 12px; margin: 12px 0; border-radius: 8px; border: none; box-sizing: border-box; font-size: 16px; }}
+      button {{ width: 100%; padding: 12px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }}
+      .err {{ color: #f87171; font-size: 14px; margin-bottom: 8px; }}
+    </style></head>
+    <body><div class="box">
+      <h3>🏪 {branch["name"]} သို့ ဝင်ရောက်ရန်</h3>
+      <div class="err">{error}</div>
+      <form method="POST">
+        <input type="password" name="password" placeholder="ဆိုင်ခွဲ Password ထည့်ပါ" required autofocus>
+        <button type="submit">ကောင်တာ ဖွင့်မည်</button>
+      </form>
+      <p style="margin-top:15px;"><a href="/" style="color:#94a3b8; font-size:13px;">← ဆိုင်ခွဲရွေးချယ်ရန် စာမျက်နှာသို့</a></p>
+    </div></body></html>
+    '''
+
+@app.route("/pos/<branch_code>/logout")
+def branch_logout(branch_code):
+    allowed = session.get("allowed_branches", [])
+    if branch_code in allowed:
+        allowed.remove(branch_code)
+    session["allowed_branches"] = allowed
+    return redirect(url_for("branch_login", branch_code=branch_code))
+
+# --- ဆိုင်ခွဲအလိုက် POS ကောင်တာ (Password စစ်ဆေးပြီးမှ ဝင်ခွင့်ပြုမည်) ---
 @app.route("/pos/<branch_code>")
 def pos_page(branch_code):
+    if not has_branch_access(branch_code):
+        return redirect(url_for("branch_login", branch_code=branch_code))
+
     conn = get_db()
     branch = conn.execute("SELECT * FROM branches WHERE code = ?", (branch_code,)).fetchone()
     if not branch:
@@ -210,6 +268,59 @@ def pos_page(branch_code):
         products=product_list,
         scanner_url=scanner_url,
         scanner_qr=scanner_qr
+    )
+
+# --- ဆိုင်ခွဲအလိုက် သီးသန့် စာရင်း (၄) မျိုး ကြည့်ရှုရန် စာမျက်နှာ ---
+@app.route("/pos/<branch_code>/reports")
+def branch_reports(branch_code):
+    if not has_branch_access(branch_code):
+        return redirect(url_for("branch_login", branch_code=branch_code))
+
+    conn = get_db()
+    branch = conn.execute("SELECT * FROM branches WHERE code = ?", (branch_code,)).fetchone()
+    if not branch:
+        conn.close()
+        return redirect(url_for("index_page"))
+
+    # ၁။ ဤဆိုင်ခွဲ၏ လက်ကျန်စာရင်း
+    stocks = conn.execute('''
+        SELECT p.code, p.name, p.price, COALESCE(bs.stock, 0) AS stock, (p.price * COALESCE(bs.stock, 0)) AS total_val
+        FROM products p
+        LEFT JOIN branch_stocks bs ON bs.product_id = p.id AND bs.branch_id = ?
+        ORDER BY p.id DESC
+    ''', (branch["id"],)).fetchall()
+
+    # ၂။ ဤဆိုင်ခွဲ၏ အရောင်းစာရင်း
+    sales = conn.execute(
+        "SELECT * FROM sales WHERE branch_name = ? ORDER BY id DESC LIMIT 300",
+        (branch["name"],)
+    ).fetchall()
+    total_sales_amt = conn.execute(
+        "SELECT COALESCE(SUM(subtotal), 0) FROM sales WHERE branch_name = ?",
+        (branch["name"],)
+    ).fetchone()[0]
+
+    # ၃။ ဤဆိုင်ခွဲ၏ ပစ္စည်းအဝင်စာရင်း
+    in_logs = conn.execute(
+        "SELECT * FROM stock_logs WHERE branch_name = ? AND change_type = 'ပစ္စည်းအဝင်' ORDER BY id DESC LIMIT 300",
+        (branch["name"],)
+    ).fetchall()
+
+    # ၄။ ဤဆိုင်ခွဲ၏ အပျက်အစီးစာရင်း
+    dmg_logs = conn.execute(
+        "SELECT * FROM stock_logs WHERE branch_name = ? AND change_type = 'အပျက်အစီးနှုတ်' ORDER BY id DESC LIMIT 300",
+        (branch["name"],)
+    ).fetchall()
+    conn.close()
+
+    return render_template(
+        "branch_reports.html",
+        branch=branch,
+        stocks=stocks,
+        sales=sales,
+        total_sales_amt=total_sales_amt,
+        in_logs=in_logs,
+        dmg_logs=dmg_logs
     )
 
 @app.route("/scanner/<branch_code>")
@@ -305,13 +416,14 @@ def admin_page():
         base_url=base_url
     )
 
-# --- API: ဆိုင်ခွဲ အသစ်ထည့်ခြင်း နှင့် ဖျက်ခြင်း ---
+# --- API: ဆိုင်ခွဲ အသစ်ထည့်ခြင်း၊ Password ပြင်ခြင်း၊ ဖျက်ခြင်း ---
 @app.route("/api/branches", methods=["POST"])
 @admin_required
 def add_branch():
     data = request.json
     name = data.get("name", "").strip()
     custom_code = data.get("code", "").strip().lower()
+    password = data.get("password", "").strip() or "1111"
     if not name:
         return jsonify({"status": "error", "message": "ဆိုင်ခွဲအမည် ထည့်ပါ"}), 400
 
@@ -322,7 +434,7 @@ def add_branch():
         custom_code = f"shop{max_id + 1}"
 
     try:
-        c.execute("INSERT INTO branches (code, name) VALUES (?, ?)", (custom_code, name))
+        c.execute("INSERT INTO branches (code, name, password) VALUES (?, ?, ?)", (custom_code, name, password))
         new_bid = c.lastrowid
         products = c.execute("SELECT id FROM products").fetchall()
         for p in products:
@@ -331,6 +443,19 @@ def add_branch():
     except sqlite3.IntegrityError:
         conn.close()
         return jsonify({"status": "error", "message": "ဒီဆိုင်ခွဲအမည် သို့မဟုတ် ကုတ် ရှိပြီးသားဖြစ်နေပါတယ်"}), 400
+    conn.close()
+    return jsonify({"status": "ok"})
+
+@app.route("/api/branches/<int:bid>/password", methods=["PUT"])
+@admin_required
+def update_branch_password(bid):
+    data = request.json
+    new_pw = data.get("password", "").strip()
+    if not new_pw:
+        return jsonify({"status": "error", "message": "Password အသစ် ထည့်ပါ"}), 400
+    conn = get_db()
+    conn.execute("UPDATE branches SET password = ? WHERE id = ?", (new_pw, bid))
+    conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
 
@@ -459,7 +584,7 @@ def adjust_stock():
     conn.close()
     return jsonify({"status": "ok", "new_stock": new_stock})
 
-# --- API: Scan နှင့် Real-time Stream (ဆိုင်ခွဲအလိုက်) ---
+# --- API: Scan နှင့် Real-time Stream ---
 @app.route("/api/scan", methods=["POST"])
 def handle_scan():
     data = request.json
@@ -504,12 +629,14 @@ def stream(branch_code):
     resp.headers["X-Accel-Buffering"] = "no"
     return resp
 
-# --- API: ငွေရှင်းခြင်း (သက်ဆိုင်ရာ ဆိုင်ခွဲ Stock မှ နှုတ်ခြင်း) ---
+# --- API: ငွေရှင်းခြင်း ---
 @app.route("/api/checkout", methods=["POST"])
 def checkout():
     data = request.json
     cart = data.get("cart", [])
     branch_code = data.get("branch_code", "shop1").strip()
+    if not has_branch_access(branch_code):
+        return jsonify({"status": "error", "message": "ဆိုင်ခွဲ Login ဝင်ရန် လိုအပ်ပါသည်"}), 401
     if not cart:
         return jsonify({"status": "error", "message": "ပစ္စည်းမရှိပါ"}), 400
 
@@ -553,13 +680,13 @@ def checkout():
     excel_ok, excel_msg = append_to_excel(excel_rows)
     return jsonify({
         "status": "ok",
+        "branch_name": branch["name"],
         "receipt_no": receipt_no,
         "sale_time": now_str,
         "excel_ok": excel_ok,
         "excel_msg": excel_msg
     })
 
-# --- API: Excel Download (ဆိုင်ခွဲအားလုံး စာရင်းအစုံ) ---
 @app.route("/api/export_excel")
 @admin_required
 def export_excel():
