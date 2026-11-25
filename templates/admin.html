@@ -24,9 +24,10 @@
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     th, td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: middle; }
     th { background: #f8fafc; }
-    .pw-input { width: 120px; padding: 6px 10px; font-weight: bold; letter-spacing: 1px; }
-    .qr-img { width: 64px; height: 64px; border: 1px solid #e2e8f0; border-radius: 4px; }
+    .pw-input { width: 110px; padding: 6px 10px; font-weight: bold; letter-spacing: 1px; }
+    .qr-img { width: 60px; height: 60px; border: 1px solid #e2e8f0; border-radius: 4px; }
     .badge-low { background: #fee2e2; color: #b91c1c; padding: 3px 8px; border-radius: 6px; font-weight: bold; }
+    .sticker-opt { display: inline-flex; align-items: center; gap: 6px; background: #f8fafc; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
   </style>
 </head>
 <body>
@@ -41,11 +42,11 @@
 </div>
 
 <div class="tabs">
-  <button class="tab-btn active" onclick="openTab('branchTab', this)">🏪 ဆိုင်ခွဲနှင့် Password များ</button>
-  <button class="tab-btn" onclick="openTab('productTab', this)">🏷️ ပစ္စည်းနှင့် Master ဈေးနှုန်း</button>
-  <button class="tab-btn" onclick="openTab('stockTab', this)">📦 ဆိုင်ခွဲအလိုက် Stock အဝင်/အပျက်</button>
-  <button class="tab-btn" onclick="openTab('salesTab', this)">💰 အရောင်းစာရင်းအားလုံး</button>
-  <button class="tab-btn" onclick="openTab('logsTab', this)">📋 အဝင် / အပျက် မှတ်တမ်း</button>
+  <button id="btn_branchTab" class="tab-btn active" onclick="openTab('branchTab')">🏪 ဆိုင်ခွဲနှင့် Password များ</button>
+  <button id="btn_productTab" class="tab-btn" onclick="openTab('productTab')">🏷️ ပစ္စည်းနှင့် Master ဈေးနှုန်း</button>
+  <button id="btn_stockTab" class="tab-btn" onclick="openTab('stockTab')">📦 ဆိုင်ခွဲအလိုက် Stock အဝင်/အပျက်</button>
+  <button id="btn_salesTab" class="tab-btn" onclick="openTab('salesTab')">💰 အရောင်းစာရင်းအားလုံး</button>
+  <button id="btn_logsTab" class="tab-btn" onclick="openTab('logsTab')">📋 အဝင် / အပျက် မှတ်တမ်း</button>
 </div>
 
 <!-- ၁။ ဆိုင်ခွဲနှင့် Password စီမံခန့်ခွဲမှု -->
@@ -107,8 +108,9 @@
         <th>ကုတ်</th>
         <th>ပစ္စည်းအမည်</th>
         <th>Master ဈေးနှုန်း (ကျပ်)</th>
-        <th>ဆိုင်ခွဲအားလုံး စုစုပေါင်းလက်ကျန်</th>
-        <th>Sticker / ဖျက်ရန်</th>
+        <th>စုစုပေါင်းလက်ကျန်</th>
+        <th>Sticker Print (အရေအတွက် / ဈေးနှုန်း Option)</th>
+        <th>ဖျက်</th>
       </tr>
     </thead>
     <tbody>
@@ -118,12 +120,20 @@
         <td><strong>{{ p.code }}</strong></td>
         <td>{{ p.name }}</td>
         <td>
-          <input type="number" id="price_{{ p.id }}" value="{{ p.price }}" style="width:110px; padding:6px;">
-          <button class="btn-amber btn-sm" onclick="updatePrice({{ p.id }})">ဈေးပြင်မည်</button>
+          <input type="number" id="price_{{ p.id }}" value="{{ p.price }}" style="width:100px; padding:6px;">
+          <button class="btn-amber btn-sm" onclick="updatePrice({{ p.id }})">ဈေးပြင်</button>
         </td>
         <td><strong>{{ p.total_stock }}</strong></td>
         <td>
-          <button class="btn-blue btn-sm" onclick="printSticker('{{ p.code }}', '{{ p.name }}', {{ p.price }}, '{{ p.qr }}')">Sticker ထုတ်</button>
+          <div class="sticker-opt">
+            <input type="number" id="stk_qty_{{ p.id }}" value="1" min="1" max="200" style="width:55px; padding:5px;" title="ထုတ်မည့်အရေအတွက်">
+            <label style="font-size:13px; cursor:pointer; user-select:none;">
+              <input type="checkbox" id="stk_price_{{ p.id }}" checked> ဈေးထည့်မည်
+            </label>
+            <button class="btn-blue btn-sm" onclick="printSticker({{ p.id }}, '{{ p.code }}', '{{ p.name }}', {{ p.price }}, '{{ p.qr }}')">Print</button>
+          </div>
+        </td>
+        <td>
           <button class="btn-red" onclick="deleteProduct({{ p.id }}, '{{ p.name }}')">ဖျက်</button>
         </td>
       </tr>
@@ -253,11 +263,20 @@
 </div>
 
 <script>
-  function openTab(tabId, btn) {
+  function openTab(tabId) {
+    localStorage.setItem("adminActiveTab", tabId);
     document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-    btn.classList.add('active');
+    const card = document.getElementById(tabId);
+    const btn = document.getElementById("btn_" + tabId);
+    if (card) card.classList.add('active');
+    if (btn) btn.classList.add('active');
+  }
+
+  // Reload ဖြစ်တိုင်း မူလ Tab ပြန်ပွင့်စေရန်
+  const savedTab = localStorage.getItem("adminActiveTab");
+  if (savedTab && document.getElementById(savedTab)) {
+    openTab(savedTab);
   }
 
   function addBranch() {
@@ -331,7 +350,7 @@
     })
     .then(r => r.json())
     .then(res => {
-      if (res.status === "ok") alert("Master ဈေးနှုန်း ပြင်ဆင်ပြီးပါပြီ");
+      if (res.status === "ok") location.reload();
       else alert(res.message);
     });
   }
@@ -365,20 +384,38 @@
     });
   }
 
-  function printSticker(code, name, price, qrSrc) {
-    const win = window.open("", "_blank", "width=300,height=320");
+  function printSticker(pid, code, name, price, qrSrc) {
+    const qty = Math.max(1, parseInt(document.getElementById("stk_qty_" + pid).value || "1", 10));
+    const showPrice = document.getElementById("stk_price_" + pid).checked;
+    const latestPrice = document.getElementById("price_" + pid).value || price;
+
+    let itemsHtml = "";
+    for (let i = 0; i < qty; i++) {
+      itemsHtml += `
+        <div class="stk">
+          <img src="${qrSrc}">
+          <div class="name">${name} (${code})</div>
+          ${showPrice ? `<div class="price">${Number(latestPrice).toLocaleString()} ကျပ်</div>` : ""}
+        </div>
+      `;
+    }
+
+    const win = window.open("", "_blank", "width=650,height=600");
     win.document.write(`
-      <html><head><title>${code}</title>
+      <html><head><title>Sticker - ${code} (${qty} ခု)</title>
       <style>
-        body { font-family: sans-serif; text-align: center; margin: 10px; }
-        img { width: 130px; height: 130px; }
-        .name { font-weight: bold; font-size: 14px; margin-top: 4px; }
-        .price { font-size: 15px; font-weight: bold; margin-top: 2px; }
+        body { font-family: 'Segoe UI', Pyidaungsu, sans-serif; margin: 10px; }
+        .grid { display: flex; flex-wrap: wrap; gap: 10px; }
+        .stk {
+          width: 145px; border: 1px dashed #94a3b8; border-radius: 6px;
+          padding: 8px; text-align: center; page-break-inside: avoid;
+        }
+        img { width: 105px; height: 105px; }
+        .name { font-weight: bold; font-size: 12px; margin-top: 3px; }
+        .price { font-size: 13px; font-weight: bold; margin-top: 2px; }
       </style></head>
-      <body onload="window.print(); setTimeout(() => window.close(), 400);">
-        <img src="${qrSrc}">
-        <div class="name">${name} (${code})</div>
-        <div class="price">${Number(price).toLocaleString()} ကျပ်</div>
+      <body onload="window.print(); setTimeout(() => window.close(), 500);">
+        <div class="grid">${itemsHtml}</div>
       </body></html>
     `);
     win.document.close();
