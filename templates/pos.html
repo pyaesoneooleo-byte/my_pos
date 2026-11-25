@@ -7,7 +7,8 @@
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
     body { font-family: 'Segoe UI', Pyidaungsu, sans-serif; background: #f1f5f9; margin: 0; padding: 15px; }
-    .topbar { display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: #fff; padding: 12px 20px; border-radius: 10px; margin-bottom: 15px; }
+    .topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: #0f172a; color: #fff; padding: 12px 20px; border-radius: 10px; margin-bottom: 15px; }
+    .nav-links a { color: #fff; text-decoration: none; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: bold; margin-left: 6px; }
     .container { display: grid; grid-template-columns: 2fr 1fr; gap: 15px; }
     @media (max-width: 850px) { .container { grid-template-columns: 1fr; } }
     .card { background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
@@ -28,9 +29,10 @@
 
 <div class="topbar">
   <div><strong>🏪 {{ branch.name }}</strong> | POS အရောင်းကောင်တာ</div>
-  <div>
-    <a href="/" style="color:#93c5fd; margin-right:15px; text-decoration:none;">ဆိုင်ခွဲပြောင်းရန်</a>
-    <a href="/admin" style="color:#6ee7b7; text-decoration:none;">Admin</a>
+  <div class="nav-links">
+    <a href="/pos/{{ branch.code }}/reports" style="background:#0284c7;">📊 ဆိုင်ခွဲစာရင်းများ</a>
+    <a href="/" style="background:#334155;">ဆိုင်ခွဲပြောင်းရန်</a>
+    <a href="/pos/{{ branch.code }}/logout" style="background:#dc2626;">Lock / ထွက်မည်</a>
   </div>
 </div>
 
@@ -56,7 +58,7 @@
     </table>
 
     <div class="total-box">စုစုပေါင်း: <span id="grandTotal">0</span> ကျပ်</div>
-    <button class="btn-green" onclick="checkout()">ငွေရှင်းမည် (Checkout)</button>
+    <button class="btn-green" onclick="checkout()">ငွေရှင်းပြီး ဘောင်ချာထုတ်မည် (Print)</button>
   </div>
 
   <div class="card">
@@ -74,10 +76,10 @@
 </div>
 
 <script>
-const BRANCH_CODE = "{{ branch.code }}";
+  const BRANCH_CODE = "{{ branch.code }}";
+  const BRANCH_NAME = "{{ branch.name }}";
   let cart = [];
 
-  // Supermarket Barcode Scanner "တီ" အသံ ထုတ်ပေးမည့် Function
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   function playBeep(type = "ok") {
     if (audioCtx.state === "suspended") audioCtx.resume();
@@ -85,22 +87,11 @@ const BRANCH_CODE = "{{ branch.code }}";
     const gain = audioCtx.createGain();
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-
-    if (type === "ok") {
-      // အောင်မြင်ရင် "တီ" (1200Hz ကြည်လင်သော အသံ)
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.12);
-    } else {
-      // ကုတ်မှားရင် "တူ" (300Hz အသံနိမ့်)
-      osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(300, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.25);
-    }
+    osc.type = type === "ok" ? "sine" : "sawtooth";
+    osc.frequency.setValueAtTime(type === "ok" ? 1200 : 300, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    osc.start();
+    osc.stop(audioCtx.currentTime + (type === "ok" ? 0.12 : 0.25));
   }
 
   document.getElementById("codeInput").addEventListener("keypress", function(e) {
@@ -127,10 +118,6 @@ const BRANCH_CODE = "{{ branch.code }}";
         playBeep("err");
         alert(res.message || "ပစ္စည်းမတွေ့ပါ");
       }
-    })
-    .catch(err => {
-      playBeep("err");
-      alert("ချိတ်ဆက်မှု Error: " + err);
     });
   }
 
@@ -142,7 +129,7 @@ const BRANCH_CODE = "{{ branch.code }}";
       cart.push({ code: prod.code, name: prod.name, price: prod.price, qty: 1 });
     }
     renderCart();
-    playBeep("ok"); // ဇယားထဲ ပစ္စည်းဝင်သည်နှင့် "တီ" မြည်မည်
+    playBeep("ok");
   }
 
   function changeQty(idx, delta) {
@@ -187,20 +174,67 @@ const BRANCH_CODE = "{{ branch.code }}";
     addItemToCart(prod);
   };
 
+  function printReceipt(receiptNo, saleTime, items, grandTotal) {
+    let rowsHtml = items.map(i => `
+      <tr>
+        <td style="padding:4px 0;">${i.name}<br><small>${i.code}</small></td>
+        <td style="text-align:center;">${i.qty}</td>
+        <td style="text-align:right;">${(i.price * i.qty).toLocaleString()}</td>
+      </tr>
+    `).join("");
+
+    const win = window.open("", "_blank", "width=380,height=600");
+    win.document.write(`
+      <html><head><title>${receiptNo}</title>
+      <style>
+        body { font-family: 'Segoe UI', Pyidaungsu, sans-serif; width: 280px; margin: 0 auto; padding: 10px; font-size: 13px; color: #000; }
+        h3, p { text-align: center; margin: 4px 0; }
+        hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th { border-bottom: 1px dashed #000; padding-bottom: 4px; font-size: 12px; }
+        .total { font-size: 16px; font-weight: bold; text-align: right; margin-top: 8px; }
+      </style></head>
+      <body onload="window.print(); setTimeout(() => window.close(), 500);">
+        <h3>${BRANCH_NAME}</h3>
+        <p>ဘောင်ချာ: ${receiptNo}</p>
+        <p>အချိန်: ${saleTime}</p>
+        <hr>
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align:left;">ပစ္စည်း</th>
+              <th style="text-align:center;">ခု</th>
+              <th style="text-align:right;">သင့်ငွေ</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        <hr>
+        <div class="total">စုစုပေါင်း: ${grandTotal.toLocaleString()} ကျပ်</div>
+        <hr>
+        <p>ဝယ်ယူအားပေးမှုကို ကျေးဇူးတင်ပါသည်</p>
+      </body></html>
+    `);
+    win.document.close();
+  }
+
   function checkout() {
     if (cart.length === 0) return alert("ပစ္စည်းအရင်ထည့်ပါ");
+    const soldItems = JSON.parse(JSON.stringify(cart));
+    const totalAmt = soldItems.reduce((sum, i) => sum + (i.price * i.qty), 0);
+
     fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cart: cart, branch_code: BRANCH_CODE })
+      body: JSON.stringify({ cart: soldItems, branch_code: BRANCH_CODE })
     })
     .then(r => r.json())
     .then(res => {
       if (res.status === "ok") {
         playBeep("ok");
-        alert(`ငွေရှင်းပြီးပါပြီ!\nဘောင်ချာ: ${res.receipt_no}`);
         cart = [];
         renderCart();
+        printReceipt(res.receipt_no, res.sale_time, soldItems, totalAmt);
       } else {
         playBeep("err");
         alert(res.message);
