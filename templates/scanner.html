@@ -1,189 +1,74 @@
 <!DOCTYPE html>
 <html lang="my">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scanner - {{ branch.name }}</title>
-<script src="https://unpkg.com/html5-qrcode"></script>
-<style>
-  body { font-family: sans-serif; margin: 0; background: #0f172a; color: #fff; text-align: center; padding: 15px; }
-  .badge { display: inline-block; background: #2563eb; padding: 5px 14px; border-radius: 20px; font-size: 14px; margin-bottom: 8px; }
-  #reader { width: 100%; max-width: 420px; min-height: 260px; margin: 15px auto; border-radius: 12px; overflow: hidden; background: #1e293b; display: flex; align-items: center; justify-content: center; }
-  #status { padding: 14px; border-radius: 8px; margin: 15px auto; max-width: 420px; font-size: 16px; font-weight: bold; background: #1e293b; }
-  .ok { background: #15803d !important; }
-  .err { background: #b91c1c !important; }
-  .controls { max-width: 420px; margin: 10px auto 0; display: flex; gap: 10px; }
-  #toggle-btn {
-    flex: 2; padding: 16px; font-size: 17px; font-weight: bold;
-    border: none; border-radius: 10px; cursor: pointer; color: #fff;
-    background: #16a34a;
-  }
-  #toggle-btn.stop { background: #dc2626; }
-  #switch-btn {
-    flex: 1; padding: 16px 10px; font-size: 15px; font-weight: bold;
-    border: none; border-radius: 10px; cursor: pointer; color: #fff;
-    background: #334155;
-  }
-  #switch-btn:hover { background: #475569; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ branch.name }} - Phone Scanner</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body { font-family: sans-serif; background: #0f172a; color: #fff; text-align: center; padding: 15px; margin: 0; }
+    #reader { max-width: 400px; margin: 15px auto; background: #fff; color: #000; border-radius: 10px; overflow: hidden; }
+    .manual { max-width: 400px; margin: 15px auto; display: flex; gap: 8px; }
+    input { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 16px; }
+    button { padding: 12px 18px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-weight: bold; }
+    #msg { margin-top: 12px; font-size: 16px; font-weight: bold; color: #4ade80; }
+  </style>
 </head>
 <body>
-  <div class="badge">{{ branch.name }}</div>
-  <h2 style="margin:4px 0;">Wireless Scanner</h2>
-  <div id="reader">ကင်မရာ ပိတ်ထားပါသည်</div>
-  <div id="status">Scan ဖတ်ရန် အောက်ပါခလုတ်ကို နှိပ်ပါ</div>
-  <div class="controls">
-    <button id="toggle-btn" onclick="toggleCamera()">ကင်မရာ ဖွင့်မယ်</button>
-    <button id="switch-btn" onclick="switchCamera()">🔄 Camera ပြောင်း</button>
+  <h3>📱 {{ branch.name }} Scanner</h3>
+  <div id="reader"></div>
+
+  <div class="manual">
+    <input type="text" id="manualCode" placeholder="ကုတ်ရိုက်ထည့်ရန် (P0001)">
+    <button onclick="sendManual()">ပို့မည်</button>
   </div>
+  <div id="msg">Scan ဖတ်ရန် အသင့်ဖြစ်ပါပြီ</div>
 
-<script>
-const BRANCH_CODE = "{{ branch.code }}";
-let isCooldown = false;
-let isScanning = false;
-let cameras = [];
-let currentCamIndex = 0;
-let wakeLock = null;
-const html5QrCode = new Html5Qrcode("reader");
+  <script>
+    const BRANCH_CODE = "{{ branch.code }}";
+    let lastCode = "";
+    let lastTime = 0;
 
-async function loadCameras() {
-  if (cameras.length > 0) return cameras;
-  cameras = await Html5Qrcode.getCameras();
-  if (!cameras || cameras.length === 0) {
-    throw new Error("ဖုန်းထဲတွင် Camera မတွေ့ပါ");
-  }
-  const backIdx = cameras.findIndex(c => /back|rear|environment/i.test(c.label));
-  currentCamIndex = backIdx !== -1 ? backIdx : cameras.length - 1;
-  return cameras;
-}
-
-async function setWakeLock(enable) {
-  if (!("wakeLock" in navigator)) return;
-  try {
-    if (enable && !wakeLock) {
-      wakeLock = await navigator.wakeLock.request("screen");
-    } else if (!enable && wakeLock) {
-      await wakeLock.release();
-      wakeLock = null;
+    function postCode(code) {
+      fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code, branch_code: BRANCH_CODE })
+      })
+      .then(r => r.json())
+      .then(res => {
+        const msg = document.getElementById("msg");
+        if (res.status === "ok") {
+          msg.style.color = "#4ade80";
+          msg.innerText = `✅ ထည့်ပြီး: ${res.product.name} (${res.product.price} ကျပ်)`;
+        } else {
+          msg.style.color = "#f87171";
+          msg.innerText = `❌ ${res.message}`;
+        }
+      });
     }
-  } catch (e) {}
-}
 
-function playBeep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(1200, ctx.currentTime);
-    osc.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.12);
-  } catch(e) {}
-}
+    function sendManual() {
+      const inp = document.getElementById("manualCode");
+      if (!inp.value.trim()) return;
+      postCode(inp.value.trim());
+      inp.value = "";
+    }
 
-async function onScanSuccess(decodedText) {
-  if (isCooldown) return;
-  isCooldown = true;
-
-  const statusBox = document.getElementById("status");
-  statusBox.className = "";
-  statusBox.innerText = "ပို့နေသည်: " + decodedText;
-
-  try {
-    const res = await fetch("/api/scan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: decodedText, branch_code: BRANCH_CODE })
+    const html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      (decodedText) => {
+        const now = Date.now();
+        if (decodedText === lastCode && now - lastTime < 1500) return;
+        lastCode = decodedText;
+        lastTime = now;
+        postCode(decodedText.trim());
+      }
+    ).catch(err => {
+      document.getElementById("msg").innerText = "ကင်မရာဖွင့်မရပါ (HTTPS လိုအပ်ပါသည်) - အောက်တွင် ကုတ်ရိုက်ထည့်နိုင်ပါသည်";
     });
-    const data = await res.json();
-    if (res.ok) {
-      playBeep();
-      statusBox.className = "ok";
-      statusBox.innerText = `✓ ${data.product.name} (${data.product.price.toLocaleString()} Ks)`;
-    } else {
-      statusBox.className = "err";
-      statusBox.innerText = "✗ " + (data.message || "မတွေ့ပါ");
-    }
-  } catch (err) {
-    statusBox.className = "err";
-    statusBox.innerText = "Server နှင့် ချိတ်ဆက်မရပါ";
-  }
-
-  setTimeout(() => { isCooldown = false; }, 1500);
-}
-
-async function startScanner() {
-  const btn = document.getElementById("toggle-btn");
-  const statusBox = document.getElementById("status");
-
-  await loadCameras();
-  const selectedCam = cameras[currentCamIndex];
-
-  document.getElementById("reader").innerText = "";
-  await html5QrCode.start(
-    selectedCam.id,
-    { fps: 10, qrbox: { width: 250, height: 250 } },
-    onScanSuccess
-  );
-  isScanning = true;
-  await setWakeLock(true);
-  btn.innerText = "ကင်မရာ ခဏပိတ်မယ်";
-  btn.className = "stop";
-  statusBox.className = "";
-  statusBox.innerText = `သုံးနေသည်: ${selectedCam.label || "Camera " + (currentCamIndex + 1)}`;
-}
-
-async function stopScanner() {
-  const btn = document.getElementById("toggle-btn");
-  const statusBox = document.getElementById("status");
-
-  await html5QrCode.stop();
-  isScanning = false;
-  await setWakeLock(false);
-  document.getElementById("reader").innerText = "ကင်မရာ ပိတ်ထားပါသည်";
-  btn.innerText = "ကင်မရာ ဖွင့်မယ်";
-  btn.className = "";
-  statusBox.className = "";
-  statusBox.innerText = "Scan ဖတ်ရန် ခလုတ်ကို ပြန်နှိပ်ပါ";
-}
-
-async function toggleCamera() {
-  const statusBox = document.getElementById("status");
-  try {
-    if (!isScanning) {
-      await startScanner();
-    } else {
-      await stopScanner();
-    }
-  } catch (err) {
-    isScanning = false;
-    statusBox.className = "err";
-    statusBox.innerText = "ကင်မရာဖွင့်မရပါ: " + err;
-  }
-}
-
-async function switchCamera() {
-  const statusBox = document.getElementById("status");
-  try {
-    await loadCameras();
-    currentCamIndex = (currentCamIndex + 1) % cameras.length;
-    const nextCam = cameras[currentCamIndex];
-
-    if (!isScanning) {
-      statusBox.className = "";
-      statusBox.innerText = `ရွေးထားသည်: ${nextCam.label || "Camera " + (currentCamIndex + 1)}`;
-      return;
-    }
-
-    await html5QrCode.stop();
-    isScanning = false;
-    await startScanner();
-  } catch (err) {
-    isScanning = false;
-    statusBox.className = "err";
-    statusBox.innerText = "Camera ပြောင်းမရပါ: " + err;
-  }
-}
-</script>
+  </script>
 </body>
 </html>
